@@ -67,6 +67,36 @@ a {
   margin-bottom: 20px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.route-switcher {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+}
+
+.route-link {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.route-link-active {
+  background: linear-gradient(135deg, #ffbfd2 0%, #ef6f99 100%);
+  color: white;
+  box-shadow: var(--shadow);
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -122,6 +152,7 @@ a {
 .dashboard {
   max-width: 1120px;
   margin: 0 auto;
+  gap: 20px;
 }
 
 .hero-card,
@@ -129,7 +160,7 @@ a {
 .summary-card,
 .auth-card,
 .song-card {
-  padding: 22px;
+  padding: 24px;
   background: var(--panel);
   border: 1px solid var(--stroke);
   border-radius: 28px;
@@ -145,23 +176,176 @@ a {
 .summary-note,
 .song-card p,
 .instruction-list,
-.goal-editor label,
 .goal-status,
 .metric-box span,
 .heart-stats span {
   color: var(--text-soft);
 }
 
-.goal-editor {
+.hero-copy,
+.summary-card,
+.auth-card,
+.runner-card,
+.song-card {
   display: grid;
-  gap: 10px;
-  max-width: 260px;
+  gap: 18px;
+}
+
+.goal-card-button {
+  width: 100%;
+  min-height: 208px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 28px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.goal-card-button span {
+  color: var(--text-soft);
+  font-size: 0.95rem;
+}
+
+.goal-card-button strong {
+  font-size: 3rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--accent-strong);
+}
+
+.goal-card-button em {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: #a6a0aa;
+}
+
+.nickname-field {
+  display: grid;
+  gap: 8px;
+  color: var(--text-soft);
+}
+
+.nickname-field input {
+  border: 1px solid rgba(226, 176, 190, 0.28);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.88);
+  outline: none;
+  color: #2f2530;
 }
 
 .hero-actions {
   grid-template-columns: auto auto;
   align-items: center;
   justify-content: start;
+}
+
+.hero-copy-main {
+  grid-area: title;
+}
+
+.hero-set-names-button {
+  grid-area: names;
+  justify-self: end;
+  align-self: start;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+}
+
+.hero-toolbar {
+  grid-area: toolbar;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.hero-goal-panel {
+  grid-area: goal;
+  display: flex;
+  justify-content: center;
+}
+
+.hero-heart-panel {
+  grid-area: heart;
+  display: grid;
+  place-items: center;
+}
+
+.hero-stats-panel {
+  grid-area: stats;
+  display: grid;
+  align-content: center;
+}
+
+.split-progress-embedded {
+  grid-area: progress;
+}
+
+.icon-button {
+  width: 52px;
+  min-width: 52px;
+  display: inline-grid;
+  place-items: center;
+  padding: 12px;
+  font-size: 1.25rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(255, 245, 249, 0.76);
+  backdrop-filter: blur(10px);
+}
+
+.nickname-modal {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+  box-shadow: 0 28px 80px rgba(226, 116, 154, 0.18);
+}
+
+.goal-modal {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+  box-shadow: 0 28px 80px rgba(226, 116, 154, 0.18);
+}
+
+.nickname-modal h3,
+.goal-modal h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2f2530;
+}
+
+.nickname-modal-header,
+.nickname-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nickname-close-button {
+  white-space: nowrap;
 }
 
 .goal-input-row {
@@ -189,8 +373,14 @@ a {
   color: var(--accent-strong);
 }
 
-.heart-panel {
-  align-items: center;
+.goal-input-row-large input {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.goal-input-row-large span {
+  padding: 10px 14px;
+  font-size: 1.08rem;
 }
 
 .heart-meter {
@@ -220,21 +410,36 @@ a {
 }
 
 .heart-progress {
-  stroke: url(#heart-gradient);
   stroke: var(--accent);
-  stroke-dasharray: 320;
-  transition: stroke-dashoffset 400ms ease;
+  transition: stroke-dasharray 400ms ease, stroke-dashoffset 400ms ease;
   filter: drop-shadow(0 8px 20px rgba(239, 111, 153, 0.22));
+}
+
+.heart-progress-total {
+  stroke: url(#heart-gradient-total);
 }
 
 .heart-center {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 2rem;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 68%;
+  font-size: 2.2rem;
   font-weight: 700;
   color: var(--accent-strong);
+  text-align: center;
+  gap: 6px;
+}
+
+.heart-center span {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
 .heart-stats,
@@ -243,7 +448,18 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
-.heart-stats div,
+.heart-stats {
+  grid-template-columns: 1fr;
+  align-content: center;
+}
+
+.heart-stats div {
+  padding: 6px 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+}
+
 .metric-box,
 .progress-pill,
 .scope-list span,
@@ -260,6 +476,26 @@ a {
   margin-top: 6px;
   color: #2a1f24;
   font-size: 1.05rem;
+}
+
+.heart-stats strong {
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.demo-love-title {
+  margin: 0;
+  font-size: clamp(2.6rem, 6vw, 4.3rem);
+  line-height: 0.95;
+  font-weight: 800;
+  color: var(--accent-strong);
+  letter-spacing: -0.06em;
+}
+
+.metric-box {
+  min-height: 104px;
+  display: grid;
+  align-content: start;
 }
 
 .info-banner,
@@ -316,6 +552,261 @@ a {
   font-size: 0.92rem;
 }
 
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--text-soft);
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.demo-field {
+  display: grid;
+  gap: 8px;
+  color: var(--text-soft);
+}
+
+.demo-input-wrap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+}
+
+.demo-input-wrap input {
+  border: 0;
+  background: transparent;
+  min-width: 0;
+  outline: none;
+}
+
+.demo-input-wrap em {
+  font-style: normal;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.pairing-grid,
+.pairing-input-row {
+  display: grid;
+  gap: 12px;
+}
+
+.pairing-input-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.pairing-input-row input {
+  border: 1px solid rgba(226, 176, 190, 0.35);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.88);
+  min-width: 0;
+}
+
+.info-toggle {
+  border-radius: 18px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.info-toggle summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 2px 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #9b95a0;
+}
+
+.info-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.info-toggle summary::after {
+  content: "+";
+  float: right;
+  color: #9b95a0;
+}
+
+.info-toggle[open] summary::after {
+  content: "−";
+}
+
+.info-toggle-content {
+  display: grid;
+  gap: 12px;
+  padding: 10px 0 2px;
+}
+
+.info-toggle-content > * {
+  margin: 0;
+}
+
+.ecg-card {
+  margin: 4px 0 8px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(236, 95, 150, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(236, 95, 150, 0.05);
+  background: rgba(255, 247, 250, 0.92);
+}
+
+.ecg-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ecg-stage {
+  position: relative;
+  padding: 16px 14px 10px;
+}
+
+.ecg-progress-fill {
+  position: absolute;
+  inset: 16px auto 10px 14px;
+  height: calc(100% - 26px);
+  background: linear-gradient(90deg, rgba(255, 199, 220, 0.42), rgba(236, 95, 150, 0.12));
+  border-radius: 18px;
+  pointer-events: none;
+  max-width: calc(100% - 28px);
+}
+
+.ecg-stage svg {
+  position: relative;
+  z-index: 1;
+}
+
+.ecg-slider {
+  position: absolute;
+  inset: 16px 14px 10px 14px;
+  width: calc(100% - 28px);
+  height: calc(100% - 26px);
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.ecg-controls {
+  display: flex;
+  justify-content: center;
+  padding: 6px 16px 18px;
+}
+
+.ecg-icon-button {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--accent-strong);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ecg-icon-heart {
+  display: inline-grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 3px solid rgba(236, 95, 150, 0.75);
+  color: var(--accent-strong);
+  font-size: 1.4rem;
+  background: rgba(255, 247, 250, 0.96);
+}
+
+.split-progress-card {
+  padding: 20px 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+}
+
+.split-progress-card.split-progress-embedded {
+  padding: 8px 0 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.split-progress-copy {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.split-progress-copy div {
+  display: grid;
+  gap: 4px;
+}
+
+.split-progress-copy div:last-child {
+  justify-items: end;
+}
+
+.split-progress-copy strong {
+  font-size: 0.98rem;
+  line-height: 1.2;
+  color: var(--accent-strong);
+}
+
+.split-progress-copy span {
+  font-size: 0.92rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.split-progress-center {
+  justify-items: center;
+}
+
+.split-progress-center strong,
+.split-progress-center span {
+  color: #8f97a2;
+}
+
+.split-progress-track {
+  position: relative;
+  padding: 6px;
+  min-height: 40px;
+  border-radius: 16px;
+  background: #eef1f5;
+}
+
+.split-progress-fill {
+  position: absolute;
+  top: 6px;
+  height: 24px;
+  border-radius: 10px;
+}
+
+.split-progress-fill-left {
+  left: 6px;
+  background: linear-gradient(90deg, #f38ab5 0%, #ec5f96 100%);
+}
+
+.split-progress-fill-right {
+  right: 6px;
+  background: linear-gradient(90deg, #ffd2e2 0%, #f7a9c8 100%);
+}
+
 .instruction-list {
   margin: 0;
   padding-left: 20px;
@@ -362,6 +853,11 @@ a {
   gap: 16px;
 }
 
+.song-card > div {
+  display: grid;
+  gap: 12px;
+}
+
 .song-card-ready {
   background: linear-gradient(135deg, rgba(255, 246, 249, 0.96), rgba(255, 226, 235, 0.92));
 }
@@ -377,19 +873,47 @@ a {
   }
 
   .hero-card {
-    grid-template-columns: 1.1fr 0.8fr;
+    grid-template-columns: minmax(210px, 0.95fr) minmax(280px, 1.1fr) minmax(240px, 0.95fr);
+    grid-template-areas:
+      "title title names"
+      ". toolbar ."
+      "goal heart stats"
+      "progress progress progress";
     align-items: start;
+    column-gap: 22px;
+    row-gap: 18px;
   }
 
-  .heart-panel {
-    grid-column: span 2;
-    grid-template-columns: minmax(260px, 360px) 1fr;
+  .hero-goal-panel,
+  .hero-heart-panel,
+  .hero-stats-panel {
+    min-height: 100%;
   }
 }
 
 @media (max-width: 759px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .hero-actions {
     grid-template-columns: 1fr;
+  }
+
+  .hero-card {
+    grid-template-areas:
+      "title"
+      "names"
+      "toolbar"
+      "goal"
+      "heart"
+      "stats"
+      "progress";
   }
 
   .song-card {
@@ -397,8 +921,21 @@ a {
     align-items: stretch;
   }
 
+  .split-progress-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .split-progress-copy div:last-child,
+  .split-progress-center {
+    justify-items: start;
+  }
+
   .connect-button,
   .song-button {
     width: 100%;
+  }
+
+  .hero-toolbar {
+    justify-content: start;
   }
 }

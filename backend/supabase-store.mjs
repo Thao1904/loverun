@@ -20,6 +20,10 @@ const supabaseUrl = process.env.SUPABASE_URL ?? "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const tokensTable = process.env.SUPABASE_STRAVA_TOKENS_TABLE ?? "strava_tokens";
 const settingsTable = process.env.SUPABASE_SETTINGS_TABLE ?? "app_settings";
+const defaultNicknames = {
+  you: "You",
+  partner: "Partner",
+};
 
 export async function readGoalState() {
   if (isSupabaseConfigured()) {
@@ -49,6 +53,81 @@ export async function readGoalState() {
   });
 }
 
+export async function readNicknameState() {
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${settingsTable}?key=eq.nicknames&select=*`,
+      { method: "GET" },
+    );
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      const row = rows[0];
+      return {
+        you: normalizeNickname(row.value?.you, defaultNicknames.you),
+        partner: normalizeNickname(row.value?.partner, defaultNicknames.partner),
+        updatedAt: row.updated_at ?? null,
+      };
+    }
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  return {
+    you: normalizeNickname(state.nicknames?.you, defaultNicknames.you),
+    partner: normalizeNickname(state.nicknames?.partner, defaultNicknames.partner),
+    updatedAt: state.nicknames?.updatedAt ?? null,
+  };
+}
+
+export async function writeNicknameState(value) {
+  const normalized = {
+    you: normalizeNickname(value?.you, defaultNicknames.you),
+    partner: normalizeNickname(value?.partner, defaultNicknames.partner),
+    updatedAt: value?.updatedAt ?? new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    await supabaseRequest(`${settingsTable}?on_conflict=key`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          key: "nicknames",
+          value: {
+            you: normalized.you,
+            partner: normalized.partner,
+          },
+          updated_at: normalized.updatedAt,
+        },
+      ]),
+    });
+    return normalized;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      nicknames: normalized,
+    },
+  });
+
+  return normalized;
+}
+
 export async function writeGoalState(value) {
   if (isSupabaseConfigured()) {
     await supabaseRequest(`${settingsTable}?on_conflict=key`, {
@@ -73,6 +152,72 @@ export async function writeGoalState(value) {
     blobPath: appStateBlobPath,
     filePath: appStateFile,
     value,
+  });
+}
+
+export async function readPairingState() {
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${settingsTable}?key=eq.pairing&select=*`,
+      { method: "GET" },
+    );
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      const row = rows[0];
+      return {
+        code: row.value?.code ?? null,
+        paired: Boolean(row.value?.paired),
+        createdAt: row.value?.createdAt ?? null,
+        pairedAt: row.value?.pairedAt ?? null,
+      };
+    }
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  return state.pairing ?? {
+    code: null,
+    paired: false,
+    createdAt: null,
+    pairedAt: null,
+  };
+}
+
+export async function writePairingState(value) {
+  if (isSupabaseConfigured()) {
+    await supabaseRequest(`${settingsTable}?on_conflict=key`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          key: "pairing",
+          value,
+          updated_at: value.pairedAt ?? value.createdAt ?? new Date().toISOString(),
+        },
+      ]),
+    });
+    return;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      pairing: value,
+    },
   });
 }
 
@@ -124,6 +269,11 @@ export async function deleteTokenEntry(athleteKey) {
 
 function isSupabaseConfigured() {
   return Boolean(supabaseUrl && supabaseServiceRoleKey);
+}
+
+function normalizeNickname(value, fallback) {
+  const normalized = String(value ?? "").trim();
+  return normalized.length > 0 ? normalized.slice(0, 24) : fallback;
 }
 
 async function supabaseRequest(pathname, init) {

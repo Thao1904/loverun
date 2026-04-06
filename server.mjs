@@ -3,12 +3,15 @@ import { access } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import {
+  createPairingCode,
   disconnectAthlete,
   env,
   exchangeCode,
   getContentType,
   getDashboard,
+  joinPairingCode,
   saveGoal,
+  saveNicknames,
 } from "./backend/core.mjs";
 
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 8787);
@@ -39,6 +42,20 @@ const server = http.createServer(async (request, response) => {
     if (url.pathname === "/api/goal" && request.method === "PUT") {
       const body = await readJsonBody(request);
       return sendJson(response, 200, await saveGoal(body?.goalKm));
+    }
+
+    if (url.pathname === "/api/nicknames" && request.method === "PUT") {
+      const body = await readJsonBody(request);
+      return sendJson(response, 200, await saveNicknames(body));
+    }
+
+    if (url.pathname === "/api/pairing/create" && request.method === "POST") {
+      return sendJson(response, 200, await createPairingCode());
+    }
+
+    if (url.pathname === "/api/pairing/join" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      return sendJson(response, 200, await joinPairingCode(body?.code));
     }
 
     if (url.pathname === "/api/strava/exchange" && request.method === "POST") {

@@ -27,6 +27,17 @@ export type AthleteSnapshot = {
 export type DashboardResponse = {
   date: string;
   goalKm: number;
+  nicknames: {
+    you: string;
+    partner: string;
+    updatedAt: string | null;
+  };
+  pairing: {
+    code: string | null;
+    paired: boolean;
+    createdAt: string | null;
+    pairedAt: string | null;
+  };
   athletes: Record<AthleteKey, AthleteSnapshot>;
   combined: {
     distanceKm: number;
@@ -66,6 +77,26 @@ export async function saveSharedGoal(goalKm: number) {
   return requestJson<{ goalKm: number; updatedAt: string }>(`${apiBaseUrl}/api/goal`, {
     method: "PUT",
     body: JSON.stringify({ goalKm }),
+  });
+}
+
+export async function saveNicknames(payload: { you: string; partner: string }) {
+  return requestJson<DashboardResponse["nicknames"]>(`${apiBaseUrl}/api/nicknames`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createPairingCode() {
+  return requestJson<DashboardResponse["pairing"]>(`${apiBaseUrl}/api/pairing/create`, {
+    method: "POST",
+  });
+}
+
+export async function joinPairingCode(code: string) {
+  return requestJson<DashboardResponse["pairing"]>(`${apiBaseUrl}/api/pairing/join`, {
+    method: "POST",
+    body: JSON.stringify({ code }),
   });
 }
 

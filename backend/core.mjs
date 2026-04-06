@@ -1,6 +1,16 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { deleteTokenEntry, getTokenEntry, readGoalState, setTokenEntry, writeGoalState } from "./supabase-store.mjs";
+import {
+  deleteTokenEntry,
+  getTokenEntry,
+  readGoalState,
+  readNicknameState,
+  readPairingState,
+  setTokenEntry,
+  writeGoalState,
+  writeNicknameState,
+  writePairingState,
+} from "./supabase-store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -17,7 +27,11 @@ export const env = {
 
 export async function getDashboard(date) {
   const resolvedDate = date ?? getTodayDateString(env.timezone);
-  const appState = await readGoalState();
+  const [appState, pairing, nicknames] = await Promise.all([
+    readGoalState(),
+    readPairingState(),
+    readNicknameState(),
+  ]);
   const athletes = {
     you: await buildAthleteSnapshot("you", resolvedDate),
     partner: await buildAthleteSnapshot("partner", resolvedDate),
@@ -40,6 +54,8 @@ export async function getDashboard(date) {
   return {
     date: resolvedDate,
     goalKm: appState.goalKm,
+    pairing,
+    nicknames,
     athletes,
     combined: {
       distanceKm: round(combinedDistanceKm),
@@ -52,6 +68,50 @@ export async function getDashboard(date) {
       ].slice(0, 256),
     },
   };
+}
+
+export async function saveNicknames(nicknames) {
+  return writeNicknameState({
+    you: nicknames?.you,
+    partner: nicknames?.partner,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function createPairingCode() {
+  const code = generatePairingCode();
+  const pairing = {
+    code,
+    paired: false,
+    createdAt: new Date().toISOString(),
+    pairedAt: null,
+  };
+
+  await writePairingState(pairing);
+  return pairing;
+}
+
+export async function joinPairingCode(inputCode) {
+  const normalizedCode = String(inputCode ?? "").trim().toUpperCase();
+
+  if (!normalizedCode) {
+    throw new Error("Pairing code is required.");
+  }
+
+  const current = await readPairingState();
+
+  if (!current.code || current.code !== normalizedCode) {
+    throw new Error("Invalid pairing code.");
+  }
+
+  const pairing = {
+    ...current,
+    paired: true,
+    pairedAt: new Date().toISOString(),
+  };
+
+  await writePairingState(pairing);
+  return pairing;
 }
 
 export async function saveGoal(goalKm) {
@@ -432,4 +492,9 @@ function emptySummary() {
     heartRateSeries: [],
     stepSource: "estimated_from_cadence",
   };
+}
+
+function generatePairingCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
 }
