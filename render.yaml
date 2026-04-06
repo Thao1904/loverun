@@ -26,19 +26,11 @@ services:
         value: America/New_York
       - key: DEFAULT_SHARED_GOAL_KM
         value: "18"
-      - key: GOOGLE_SHEETS_SPREADSHEET_ID
-        sync: false
-      - key: GOOGLE_SHEETS_GOAL_RANGE
-        value: Settings!B2
-      - key: GOOGLE_SHEETS_UPDATED_AT_RANGE
-        value: Settings!B3
-      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
-        sync: false
-      - key: GOOGLE_PRIVATE_KEY
-        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: SUPABASE_STRAVA_TOKENS_TABLE
         value: strava_tokens
+      - key: SUPABASE_SETTINGS_TABLE
+        value: app_settings

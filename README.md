@@ -7,7 +7,7 @@ Minimal mobile-first dashboard for a couple's shared Strava running goal.
 - Daily couple dashboard in English with a Vietnamese toggle in the top-right corner.
 - Shared heart progress based on the total kilometers run by both people today.
 - Backend token exchange for two Strava connections: `you` and `partner`.
-- Persistent shared goal with Google Sheets support and persistent Strava tokens with Supabase support.
+- Persistent shared goal and Strava tokens with Supabase support.
 - Automatic Strava token refresh and live daily fetch for distance, average heart rate, calories, and heart-rate streams.
 - Estimated steps based on cadence because Strava does not expose direct step totals in the public API.
 - Locked "heartbeat song" area that unlocks after the shared goal is complete.
@@ -24,26 +24,9 @@ Minimal mobile-first dashboard for a couple's shared Strava running goal.
 
 ## Persistent storage setup
 
-### Google Sheets for shared goal
+### Supabase for shared goal and Strava tokens
 
-Create a Google Sheet with a tab named `Settings`, then use:
-
-- `B2` for `goal_km`
-- `B3` for `updated_at`
-
-Add these env vars:
-
-- `GOOGLE_SHEETS_SPREADSHEET_ID`
-- `GOOGLE_SHEETS_GOAL_RANGE=Settings!B2`
-- `GOOGLE_SHEETS_UPDATED_AT_RANGE=Settings!B3`
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-- `GOOGLE_PRIVATE_KEY`
-
-Share the sheet with the Google service account email as an editor.
-
-### Supabase for Strava tokens
-
-Create a table like this in Supabase:
+Create these tables in Supabase:
 
 ```sql
 create table if not exists public.strava_tokens (
@@ -58,6 +41,12 @@ create table if not exists public.strava_tokens (
   athlete_profile text,
   updated_at timestamptz default now()
 );
+
+create table if not exists public.app_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz default now()
+);
 ```
 
 Then set:
@@ -65,6 +54,7 @@ Then set:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_STRAVA_TOKENS_TABLE=strava_tokens`
+- `SUPABASE_SETTINGS_TABLE=app_settings`
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only. Never expose it in frontend code.
 
@@ -72,14 +62,14 @@ Then set:
 
 1. Push this repo to GitHub. It is already available at [Thao1904/loverun](https://github.com/Thao1904/loverun).
 2. In Render, create a new Blueprint or Web Service from that repo.
-3. If you use the included [render.yaml](/Users/mee/Downloads/loverun/render.yaml), Render will create a Node web service with a persistent disk mounted at `/opt/render/project/data`.
-4. If you use Google Sheets for goal and Supabase for tokens, you can stay on Render free because you no longer depend on Render disk persistence.
+3. Use the included [render.yaml](/Users/mee/Downloads/loverun/render.yaml) to create a Node web service on Render free.
+4. Because shared goal and tokens now live in Supabase, you can stay on Render free and do not need Render disk persistence.
 5. Set these environment variables in Render:
    `APP_WEB_ORIGIN=https://your-service-name.onrender.com`
    `VITE_STRAVA_CLIENT_ID=...`
    `STRAVA_CLIENT_SECRET=...`
    `VITE_STRAVA_REDIRECT_URI=https://your-service-name.onrender.com/dashboard`
-   plus the Google Sheets and Supabase env vars above
+   plus the Supabase env vars above
 6. After the first deploy, open `/dashboard` and connect both Strava accounts.
 
 ## Strava authorization notes
@@ -89,7 +79,7 @@ Then set:
 - Frontend initiates authorization on `/dashboard` and receives the returned `code` there.
 - The frontend then posts `code` plus `state=you|partner` to the backend endpoint `/api/strava/exchange`.
 - Local backend stores refresh/access tokens in `./data/strava-tokens.json`.
-- With Google Sheets + Supabase configured, goal and tokens persist independently of Render restarts.
+- With Supabase configured, goal and tokens persist independently of Render restarts.
 - Suggested scopes for this dashboard: `read`, `profile:read_all`, `activity:read_all`.
 
 ## Live data behavior
@@ -100,7 +90,7 @@ Then set:
 - Heart-rate streams are collected from up to 3 recent runs today and used by the in-browser generated song.
 - Steps are estimated from `average_cadence * 2 * moving_time / 60`.
 - Shared goal is saved through `/api/goal`.
-- If Google Sheets or Supabase env vars are missing, the app falls back to local file storage.
+- If Supabase env vars are missing, the app falls back to local file storage.
 
 ## Main files
 

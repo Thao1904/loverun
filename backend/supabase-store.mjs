@@ -8,16 +8,78 @@ const tokensFile = path.resolve(
   rootDir,
   process.env.TOKENS_STORAGE_PATH ?? "./data/strava-tokens.json",
 );
+const appStateFile = path.resolve(
+  rootDir,
+  process.env.APP_STATE_STORAGE_PATH ?? "./data/app-state.json",
+);
 const tokensBlobPath = process.env.TOKENS_BLOB_PATH ?? "love-running/strava-tokens.json";
+const appStateBlobPath = process.env.APP_STATE_BLOB_PATH ?? "love-running/app-state.json";
 
+const defaultGoalKm = Number(process.env.DEFAULT_SHARED_GOAL_KM ?? 18);
 const supabaseUrl = process.env.SUPABASE_URL ?? "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-const supabaseTable = process.env.SUPABASE_STRAVA_TOKENS_TABLE ?? "strava_tokens";
+const tokensTable = process.env.SUPABASE_STRAVA_TOKENS_TABLE ?? "strava_tokens";
+const settingsTable = process.env.SUPABASE_SETTINGS_TABLE ?? "app_settings";
+
+export async function readGoalState() {
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${settingsTable}?key=eq.shared_goal&select=*`,
+      { method: "GET" },
+    );
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      const row = rows[0];
+      const goalKm = Number(row.value?.goalKm);
+
+      return {
+        goalKm: Number.isFinite(goalKm) && goalKm > 0 ? goalKm : defaultGoalKm,
+        updatedAt: row.updated_at ?? null,
+      };
+    }
+  }
+
+  return readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {
+      goalKm: defaultGoalKm,
+      updatedAt: null,
+    },
+  });
+}
+
+export async function writeGoalState(value) {
+  if (isSupabaseConfigured()) {
+    await supabaseRequest(`${settingsTable}?on_conflict=key`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          key: "shared_goal",
+          value: {
+            goalKm: value.goalKm,
+          },
+          updated_at: value.updatedAt ?? new Date().toISOString(),
+        },
+      ]),
+    });
+    return;
+  }
+
+  return writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value,
+  });
+}
 
 export async function getTokenEntry(athleteKey) {
   if (isSupabaseConfigured()) {
     const rows = await supabaseRequest(
-      `${supabaseTable}?athlete_key=eq.${encodeURIComponent(athleteKey)}&select=*`,
+      `${tokensTable}?athlete_key=eq.${encodeURIComponent(athleteKey)}&select=*`,
       {
         method: "GET",
       },
@@ -32,7 +94,7 @@ export async function getTokenEntry(athleteKey) {
 
 export async function setTokenEntry(athleteKey, entry) {
   if (isSupabaseConfigured()) {
-    await supabaseRequest(`${supabaseTable}?on_conflict=athlete_key`, {
+    await supabaseRequest(`${tokensTable}?on_conflict=athlete_key`, {
       method: "POST",
       headers: {
         Prefer: "resolution=merge-duplicates,return=representation",
@@ -49,7 +111,7 @@ export async function setTokenEntry(athleteKey, entry) {
 
 export async function deleteTokenEntry(athleteKey) {
   if (isSupabaseConfigured()) {
-    await supabaseRequest(`${supabaseTable}?athlete_key=eq.${encodeURIComponent(athleteKey)}`, {
+    await supabaseRequest(`${tokensTable}?athlete_key=eq.${encodeURIComponent(athleteKey)}`, {
       method: "DELETE",
     });
     return;
@@ -77,7 +139,7 @@ async function supabaseRequest(pathname, init) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Supabase token store request failed: ${text}`);
+    throw new Error(`Supabase request failed: ${text}`);
   }
 
   if (response.status === 204) {

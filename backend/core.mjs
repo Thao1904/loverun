@@ -1,7 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readGoalState, writeGoalState } from "./goal-store.mjs";
-import { deleteTokenEntry, getTokenEntry, setTokenEntry } from "./token-store.mjs";
+import { deleteTokenEntry, getTokenEntry, readGoalState, setTokenEntry, writeGoalState } from "./supabase-store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
