@@ -50,3 +50,5 @@ Minimal mobile-first dashboard for a couple's shared Strava running goal.
 - Shared backend logic: `/Users/mee/Downloads/loverun/backend/core.mjs`
 - Vercel API routes: `/Users/mee/Downloads/loverun/api`
 - Environment example: `/Users/mee/Downloads/loverun/.env.example`
+
+# loverun
