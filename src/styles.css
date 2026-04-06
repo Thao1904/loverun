@@ -1,0 +1,404 @@
+:root {
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  color: #2e2430;
+  background:
+    radial-gradient(circle at top, rgba(255, 214, 227, 0.9), transparent 30%),
+    linear-gradient(180deg, #fff9fb 0%, #fff3f7 100%);
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --panel: rgba(255, 255, 255, 0.78);
+  --panel-strong: rgba(255, 255, 255, 0.92);
+  --stroke: rgba(226, 176, 190, 0.45);
+  --text-soft: #7d6873;
+  --accent: #ef6f99;
+  --accent-strong: #de4d81;
+  --shadow: 0 24px 60px rgba(226, 116, 154, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+a {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.topbar,
+.dashboard,
+.hero-card,
+.stats-grid,
+.summary-grid,
+.runner-metrics,
+.heart-panel,
+.summary-header,
+.goal-input-row,
+.hero-actions,
+.auth-actions-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.topbar {
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-heart {
+  display: inline-grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffbfd2 0%, #ef6f99 100%);
+  color: white;
+  font-size: 1.8rem;
+  box-shadow: var(--shadow);
+}
+
+.brand h1,
+.hero-card h2,
+.summary-card h3,
+.runner-card h3,
+.song-card h3,
+.auth-card h3 {
+  margin: 0;
+  font-weight: 700;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lang-toggle,
+.connect-button,
+.song-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: var(--panel-strong);
+  color: #3a2c33;
+  box-shadow: var(--shadow);
+}
+
+.lang-toggle {
+  min-width: 64px;
+  cursor: pointer;
+}
+
+.dashboard {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.hero-card,
+.runner-card,
+.summary-card,
+.auth-card,
+.song-card {
+  padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 28px;
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+}
+
+.hero-card {
+  overflow: hidden;
+}
+
+.hero-description,
+.summary-note,
+.song-card p,
+.instruction-list,
+.goal-editor label,
+.goal-status,
+.metric-box span,
+.heart-stats span {
+  color: var(--text-soft);
+}
+
+.goal-editor {
+  display: grid;
+  gap: 10px;
+  max-width: 260px;
+}
+
+.hero-actions {
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: start;
+}
+
+.goal-input-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 6px 6px 6px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(239, 111, 153, 0.16);
+}
+
+.goal-input-row input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+  font-size: 1.05rem;
+  color: #23181f;
+}
+
+.goal-input-row span {
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: #ffe0ea;
+  color: var(--accent-strong);
+}
+
+.heart-panel {
+  align-items: center;
+}
+
+.heart-meter {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 320px);
+  margin: 0 auto;
+}
+
+.heart-meter svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.heart-track,
+.heart-progress {
+  fill: none;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.heart-track {
+  stroke: rgba(255, 195, 214, 0.72);
+}
+
+.heart-progress {
+  stroke: url(#heart-gradient);
+  stroke: var(--accent);
+  stroke-dasharray: 320;
+  transition: stroke-dashoffset 400ms ease;
+  filter: drop-shadow(0 8px 20px rgba(239, 111, 153, 0.22));
+}
+
+.heart-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.heart-stats,
+.summary-grid,
+.runner-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.heart-stats div,
+.metric-box,
+.progress-pill,
+.scope-list span,
+.runner-badge {
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+}
+
+.heart-stats strong,
+.metric-box strong {
+  display: block;
+  margin-top: 6px;
+  color: #2a1f24;
+  font-size: 1.05rem;
+}
+
+.info-banner,
+.date-pill,
+.ghost-button,
+.disconnect-button {
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 176, 190, 0.35);
+}
+
+.info-banner {
+  color: #5a4a54;
+}
+
+.info-banner-error,
+.runner-error {
+  color: #a03c5d;
+}
+
+.ghost-button,
+.disconnect-button {
+  border: 1px solid rgba(226, 176, 190, 0.45);
+  cursor: pointer;
+}
+
+.date-pill {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.runner-header,
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.runner-badge,
+.progress-pill {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.runner-status,
+.runner-error {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+}
+
+.instruction-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.auth-status {
+  padding: 14px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.auth-status-connected {
+  background: rgba(232, 255, 242, 0.9);
+  color: #216743;
+}
+
+.auth-status-error {
+  background: rgba(255, 238, 241, 0.9);
+  color: #a03c5d;
+}
+
+.scope-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.auth-actions-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.connect-button,
+.song-button {
+  background: linear-gradient(135deg, #ffbfd2 0%, #ef6f99 100%);
+  color: white;
+  font-weight: 700;
+  text-align: center;
+}
+
+.song-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.song-card-ready {
+  background: linear-gradient(135deg, rgba(255, 246, 249, 0.96), rgba(255, 226, 235, 0.92));
+}
+
+.song-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    padding: 32px;
+  }
+
+  .hero-card {
+    grid-template-columns: 1.1fr 0.8fr;
+    align-items: start;
+  }
+
+  .heart-panel {
+    grid-column: span 2;
+    grid-template-columns: minmax(260px, 360px) 1fr;
+  }
+}
+
+@media (max-width: 759px) {
+  .hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .song-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .connect-button,
+  .song-button {
+    width: 100%;
+  }
+}
