@@ -11,8 +11,8 @@ import {
   saveGoal,
 } from "./backend/core.mjs";
 
-const port = Number(process.env.API_PORT ?? 8787);
-const host = process.env.API_HOST ?? "127.0.0.1";
+const port = Number(process.env.PORT ?? process.env.API_PORT ?? 8787);
+const host = process.env.API_HOST ?? "0.0.0.0";
 const webOrigin = process.env.APP_WEB_ORIGIN ?? "http://localhost:5173";
 const allowedOrigins = new Set([webOrigin, "http://localhost:4173"]);
 

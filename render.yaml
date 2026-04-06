@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: loverun
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: loverun-data
+      mountPath: /opt/render/project/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: PORT
+        value: 10000
+      - key: VITE_API_BASE_URL
+        value: ""
+      - key: APP_WEB_ORIGIN
+        sync: false
+      - key: VITE_STRAVA_CLIENT_ID
+        sync: false
+      - key: STRAVA_CLIENT_SECRET
+        sync: false
+      - key: VITE_STRAVA_REDIRECT_URI
+        sync: false
+      - key: APP_TIMEZONE
+        value: America/New_York
+      - key: TOKENS_STORAGE_PATH
+        value: /opt/render/project/data/strava-tokens.json
+      - key: APP_STATE_STORAGE_PATH
+        value: /opt/render/project/data/app-state.json
+      - key: DEFAULT_SHARED_GOAL_KM
+        value: "18"
