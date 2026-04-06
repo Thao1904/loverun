@@ -2,15 +2,11 @@ services:
   - type: web
     name: loverun
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    disk:
-      name: loverun-data
-      mountPath: /opt/render/project/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: 22.16.0
@@ -28,9 +24,21 @@ services:
         sync: false
       - key: APP_TIMEZONE
         value: America/New_York
-      - key: TOKENS_STORAGE_PATH
-        value: /opt/render/project/data/strava-tokens.json
-      - key: APP_STATE_STORAGE_PATH
-        value: /opt/render/project/data/app-state.json
       - key: DEFAULT_SHARED_GOAL_KM
         value: "18"
+      - key: GOOGLE_SHEETS_SPREADSHEET_ID
+        sync: false
+      - key: GOOGLE_SHEETS_GOAL_RANGE
+        value: Settings!B2
+      - key: GOOGLE_SHEETS_UPDATED_AT_RANGE
+        value: Settings!B3
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STRAVA_TOKENS_TABLE
+        value: strava_tokens

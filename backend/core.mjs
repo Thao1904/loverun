@@ -1,26 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readStoredJson, writeStoredJson } from "./storage.mjs";
+import { readGoalState, writeGoalState } from "./goal-store.mjs";
+import { deleteTokenEntry, getTokenEntry, setTokenEntry } from "./token-store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
-
-const paths = {
-  tokensFile: path.resolve(
-    rootDir,
-    process.env.TOKENS_STORAGE_PATH ?? "./data/strava-tokens.json",
-  ),
-  appStateFile: path.resolve(
-    rootDir,
-    process.env.APP_STATE_STORAGE_PATH ?? "./data/app-state.json",
-  ),
-  distDir: path.resolve(rootDir, "dist"),
-};
-
-const blobPaths = {
-  tokens: process.env.TOKENS_BLOB_PATH ?? "love-running/strava-tokens.json",
-  appState: process.env.APP_STATE_BLOB_PATH ?? "love-running/app-state.json",
-};
 
 const runTypes = new Set(["Run", "TrailRun", "VirtualRun"]);
 
@@ -29,15 +13,15 @@ export const env = {
   clientSecret: process.env.STRAVA_CLIENT_SECRET ?? "",
   timezone: process.env.APP_TIMEZONE ?? "America/New_York",
   defaultGoalKm: Number(process.env.DEFAULT_SHARED_GOAL_KM ?? 18),
-  distDir: paths.distDir,
+  distDir: path.resolve(rootDir, "dist"),
 };
 
 export async function getDashboard(date) {
   const resolvedDate = date ?? getTodayDateString(env.timezone);
-  const [tokenStore, appState] = await Promise.all([readTokenStore(), readAppState()]);
+  const appState = await readGoalState();
   const athletes = {
-    you: await buildAthleteSnapshot("you", tokenStore, resolvedDate),
-    partner: await buildAthleteSnapshot("partner", tokenStore, resolvedDate),
+    you: await buildAthleteSnapshot("you", resolvedDate),
+    partner: await buildAthleteSnapshot("partner", resolvedDate),
   };
 
   const combinedDistanceKm = athletes.you.summary.distanceKm + athletes.partner.summary.distanceKm;
@@ -83,7 +67,7 @@ export async function saveGoal(goalKm) {
     updatedAt: new Date().toISOString(),
   };
 
-  await writeAppState(nextState);
+  await writeGoalState(nextState);
   return nextState;
 }
 
@@ -118,9 +102,7 @@ export async function exchangeCode({ athleteKey, code, scope }) {
   }
 
   const tokenData = await tokenResponse.json();
-  const store = await readTokenStore();
-
-  store[normalizedAthleteKey] = {
+  await setTokenEntry(normalizedAthleteKey, {
     athleteKey: normalizedAthleteKey,
     accessToken: tokenData.access_token,
     refreshToken: tokenData.refresh_token,
@@ -135,9 +117,7 @@ export async function exchangeCode({ athleteKey, code, scope }) {
         }
       : null,
     updatedAt: new Date().toISOString(),
-  };
-
-  await writeTokenStore(store);
+  });
   return { ok: true, athleteKey: normalizedAthleteKey };
 }
 
@@ -148,9 +128,7 @@ export async function disconnectAthlete(athleteKey) {
     throw new Error("athleteKey is required.");
   }
 
-  const store = await readTokenStore();
-  delete store[normalizedAthleteKey];
-  await writeTokenStore(store);
+  await deleteTokenEntry(normalizedAthleteKey);
   return { ok: true };
 }
 
@@ -182,43 +160,8 @@ export function getContentType(filePath) {
   return "application/octet-stream";
 }
 
-async function readTokenStore() {
-  return readStoredJson({
-    blobPath: blobPaths.tokens,
-    filePath: paths.tokensFile,
-    fallback: {},
-  });
-}
-
-async function writeTokenStore(store) {
-  return writeStoredJson({
-    blobPath: blobPaths.tokens,
-    filePath: paths.tokensFile,
-    value: store,
-  });
-}
-
-async function readAppState() {
-  return readStoredJson({
-    blobPath: blobPaths.appState,
-    filePath: paths.appStateFile,
-    fallback: {
-      goalKm: env.defaultGoalKm,
-      updatedAt: null,
-    },
-  });
-}
-
-async function writeAppState(value) {
-  return writeStoredJson({
-    blobPath: blobPaths.appState,
-    filePath: paths.appStateFile,
-    value,
-  });
-}
-
-async function buildAthleteSnapshot(athleteKey, store, date) {
-  const storedToken = store[athleteKey];
+async function buildAthleteSnapshot(athleteKey, date) {
+  const storedToken = await getTokenEntry(athleteKey);
 
   if (!storedToken) {
     return {
@@ -230,7 +173,7 @@ async function buildAthleteSnapshot(athleteKey, store, date) {
   }
 
   try {
-    const accessToken = await ensureAccessToken(athleteKey, store);
+    const accessToken = await ensureAccessToken(athleteKey);
     const athlete = await stravaGet("/api/v3/athlete", accessToken);
     const activities = await listRunningActivities(accessToken, date);
     const details = await Promise.all(
@@ -335,8 +278,8 @@ function estimateSteps(activity) {
   return averageCadence * 2 * (movingTime / 60);
 }
 
-async function ensureAccessToken(athleteKey, store) {
-  const tokenEntry = store[athleteKey];
+async function ensureAccessToken(athleteKey) {
+  const tokenEntry = await getTokenEntry(athleteKey);
 
   if (!tokenEntry) {
     throw new Error("No token found for athlete.");
@@ -372,7 +315,7 @@ async function ensureAccessToken(athleteKey, store) {
   }
 
   const refreshed = await refreshResponse.json();
-  store[athleteKey] = {
+  const nextEntry = {
     ...tokenEntry,
     accessToken: refreshed.access_token,
     refreshToken: refreshed.refresh_token,
@@ -380,7 +323,7 @@ async function ensureAccessToken(athleteKey, store) {
     updatedAt: new Date().toISOString(),
   };
 
-  await writeTokenStore(store);
+  await setTokenEntry(athleteKey, nextEntry);
   return refreshed.access_token;
 }
 
