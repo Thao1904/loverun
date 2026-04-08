@@ -145,7 +145,7 @@ function App() {
 
   useEffect(() => {
     void handleStravaCallback();
-  }, []);
+  }, [authUser]);
 
   useEffect(() => {
     const handlePopState = () => setRoute(getRouteFromLocation());
