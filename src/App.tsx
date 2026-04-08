@@ -5,10 +5,15 @@ import {
   disconnectAthlete,
   exchangeStravaCode,
   fetchDashboard,
+  fetchSession,
   joinPairingCode as joinPairingCodeRequest,
+  login as loginRequest,
+  logout as logoutRequest,
+  register as registerRequest,
   saveNicknames as saveNicknamesRequest,
   saveStravaAppCredentials as saveStravaAppCredentialsRequest,
   saveSharedGoal,
+  type AuthUser,
   type AthleteKey,
   type DashboardResponse,
 } from "./api";
@@ -49,6 +54,8 @@ type StravaAppFormState = {
   redirectUri: string;
 };
 
+type AuthMode = "login" | "register";
+
 type Route = "dashboard" | "demo";
 type HeartSegments = {
   you: number;
@@ -79,6 +86,13 @@ function App() {
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const [route, setRoute] = useState<Route>(getRouteFromLocation());
   const copy = languageCopy[language];
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authDisplayName, setAuthDisplayName] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [goalKm, setGoalKm] = useState(defaultGoalKm);
   const [savedGoalKm, setSavedGoalKm] = useState(defaultGoalKm);
   const [isSavingGoal, setIsSavingGoal] = useState(false);
@@ -119,7 +133,7 @@ function App() {
   }, [copy.partnerLabel, copy.youLabel, dashboard]);
 
   useEffect(() => {
-    void loadDashboard();
+    void loadSession();
   }, []);
 
   useEffect(() => {
@@ -250,6 +264,11 @@ function App() {
           </div>
         </div>
         <div className="topbar-actions">
+          {authUser ? (
+            <button className="ghost-button" type="button" onClick={() => void handleLogout()}>
+              Logout
+            </button>
+          ) : null}
           <nav className="route-switcher" aria-label="Views">
             <button
               className={`route-link ${route === "dashboard" ? "route-link-active" : ""}`}
@@ -278,7 +297,9 @@ function App() {
       </header>
 
       {route === "dashboard"
-        ? renderDashboard()
+        ? authUser
+          ? renderDashboard()
+          : renderAuth()
         : renderDemo()}
 
       {isGoalModalOpen ? (
@@ -445,13 +466,9 @@ function App() {
               config={dashboard?.stravaApps.you}
               onConfigure={() => openStravaAppModal("you")}
             />
-            <AuthRunnerAction
-              athleteKey="partner"
-              copy={copy}
-              title={nicknames.partner}
-              connectLabel={copy.connectPartner}
-              config={dashboard?.stravaApps.partner}
-              onConfigure={() => openStravaAppModal("partner")}
+            <MetricBox
+              label={copy.partnerLabel}
+              value={dashboard?.pairing.paired ? nicknames.partner : copy.pairingWaiting}
             />
           </div>
 
@@ -518,6 +535,58 @@ function App() {
             onClick={() => setSoundEnabled((current) => !current)}
           >
             {!songReady ? copy.songButtonLocked : soundEnabled ? copy.songButtonPause : copy.songButtonPlay}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  function renderAuth() {
+    return (
+      <main className="dashboard">
+        <section className="summary-card auth-gate-card">
+          <div className="hero-copy">
+            <p className="hero-kicker">{copy.brandTagline}</p>
+            <h2 className="demo-love-title">love run</h2>
+            <p className="hero-description">
+              Sign in to connect your Strava account, create a pairing code, and unlock a shared couple dashboard.
+            </p>
+          </div>
+          <div className="route-switcher auth-mode-switcher">
+            <button
+              className={`route-link ${authMode === "login" ? "route-link-active" : ""}`}
+              type="button"
+              onClick={() => setAuthMode("login")}
+            >
+              Login
+            </button>
+            <button
+              className={`route-link ${authMode === "register" ? "route-link-active" : ""}`}
+              type="button"
+              onClick={() => setAuthMode("register")}
+            >
+              Register
+            </button>
+          </div>
+          <div className="auth-form-grid">
+            {authMode === "register" ? (
+              <label className="nickname-field">
+                <span>Display name</span>
+                <input value={authDisplayName} onChange={(event) => setAuthDisplayName(event.target.value)} />
+              </label>
+            ) : null}
+            <label className="nickname-field">
+              <span>Email</span>
+              <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
+            </label>
+            <label className="nickname-field">
+              <span>Password</span>
+              <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} />
+            </label>
+          </div>
+          {authError ? <p className="runner-error">{authError}</p> : null}
+          <button className="song-button" type="button" onClick={() => void handleAuthSubmit()} disabled={isAuthLoading}>
+            {isAuthLoading ? "Please wait..." : authMode === "login" ? "Login" : "Create account"}
           </button>
         </section>
       </main>
@@ -620,13 +689,9 @@ function App() {
               config={dashboard?.stravaApps.you}
               onConfigure={() => openStravaAppModal("you")}
             />
-            <AuthRunnerAction
-              athleteKey="partner"
-              copy={copy}
-              title={nicknames.partner}
-              connectLabel={copy.connectPartner}
-              config={dashboard?.stravaApps.partner}
-              onConfigure={() => openStravaAppModal("partner")}
+            <MetricBox
+              label={copy.partnerLabel}
+              value={dashboard?.pairing.paired ? nicknames.partner : copy.pairingWaiting}
             />
           </div>
           <InfoToggle summary={copy.moreDetails}>
@@ -722,6 +787,11 @@ function App() {
   }
 
   async function loadDashboard() {
+    if (!authUser) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setLoadError(null);
 
@@ -739,7 +809,37 @@ function App() {
     }
   }
 
+  async function loadSession() {
+    setIsLoading(true);
+
+    try {
+      const session = await fetchSession();
+      setAuthUser(session.user);
+      if (session.user) {
+        await loadDashboardForUser(session.user);
+      }
+    } catch {
+      setAuthUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function loadDashboardForUser(user: AuthUser) {
+    const nextDashboard = await fetchDashboard();
+    setAuthUser(user);
+    setDashboard(nextDashboard);
+    setGoalKm(nextDashboard.goalKm);
+    setSavedGoalKm(nextDashboard.goalKm);
+    setNicknames(nextDashboard.nicknames);
+    setSavedNicknames(nextDashboard.nicknames);
+  }
+
   async function handleStravaCallback() {
+    if (!authUser) {
+      return;
+    }
+
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const athleteKey = normalizeAthleteKey(params.get("state"));
@@ -769,6 +869,36 @@ function App() {
   async function handleDisconnect(athleteKey: AthleteKey) {
     await disconnectAthlete(athleteKey);
     await loadDashboard();
+  }
+
+  async function handleAuthSubmit() {
+    setIsAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const auth =
+        authMode === "login"
+          ? await loginRequest({ email: authEmail, password: authPassword })
+          : await registerRequest({
+              email: authEmail,
+              password: authPassword,
+              displayName: authDisplayName,
+            });
+
+      setAuthUser(auth.user);
+      await loadDashboardForUser(auth.user);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Authentication failed.");
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    await logoutRequest();
+    setAuthUser(null);
+    setDashboard(null);
+    setAuthState("idle");
   }
 
   async function handleSaveGoal() {

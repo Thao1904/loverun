@@ -1,5 +1,13 @@
 export type AthleteKey = "you" | "partner";
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type AthleteSummary = {
   distanceKm: number;
   calories: number;
@@ -26,6 +34,7 @@ export type AthleteSnapshot = {
 
 export type DashboardResponse = {
   date: string;
+  currentUser: AuthUser;
   goalKm: number;
   stravaApps: Record<
     AthleteKey,
@@ -62,6 +71,30 @@ const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 export async function fetchDashboard(date?: string): Promise<DashboardResponse> {
   const query = date ? `?date=${encodeURIComponent(date)}` : "";
   return requestJson<DashboardResponse>(`${apiBaseUrl}/api/dashboard${query}`);
+}
+
+export async function fetchSession() {
+  return requestJson<{ user: AuthUser | null }>(`${apiBaseUrl}/api/auth/me`);
+}
+
+export async function register(payload: { email: string; password: string; displayName: string }) {
+  return requestJson<{ user: AuthUser }>(`${apiBaseUrl}/api/auth/register`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function login(payload: { email: string; password: string }) {
+  return requestJson<{ user: AuthUser }>(`${apiBaseUrl}/api/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function logout() {
+  return requestJson<{ ok: true }>(`${apiBaseUrl}/api/auth/logout`, {
+    method: "POST",
+  });
 }
 
 export async function exchangeStravaCode(payload: {
@@ -124,6 +157,7 @@ export async function joinPairingCode(code: string) {
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),

@@ -21,6 +21,10 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const tokensTable = process.env.SUPABASE_STRAVA_TOKENS_TABLE ?? "strava_tokens";
 const settingsTable = process.env.SUPABASE_SETTINGS_TABLE ?? "app_settings";
 const stravaAppsTable = process.env.SUPABASE_STRAVA_APPS_TABLE ?? "strava_app_credentials";
+const usersTable = process.env.SUPABASE_USERS_TABLE ?? "app_users";
+const pairingsTable = process.env.SUPABASE_PAIRINGS_TABLE ?? "app_pairings";
+const userStravaAppsTable = process.env.SUPABASE_USER_STRAVA_APPS_TABLE ?? "user_strava_apps";
+const userStravaTokensTable = process.env.SUPABASE_USER_STRAVA_TOKENS_TABLE ?? "user_strava_tokens";
 const defaultNicknames = {
   you: "You",
   partner: "Partner",
@@ -364,6 +368,421 @@ export async function deleteTokenEntry(athleteKey) {
   await writeFileTokenStore(store);
 }
 
+export async function createUser(value) {
+  const normalizedEmail = String(value?.email ?? "").trim().toLowerCase();
+  const user = {
+    id: value?.id,
+    email: normalizedEmail,
+    passwordHash: value?.passwordHash ?? "",
+    passwordSalt: value?.passwordSalt ?? "",
+    displayName: normalizeNickname(value?.displayName, normalizedEmail.split("@")[0] || "Runner"),
+    createdAt: value?.createdAt ?? new Date().toISOString(),
+    updatedAt: value?.updatedAt ?? new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(`${usersTable}?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          id: user.id,
+          email: user.email,
+          password_hash: user.passwordHash,
+          password_salt: user.passwordSalt,
+          display_name: user.displayName,
+          created_at: user.createdAt,
+          updated_at: user.updatedAt,
+        },
+      ]),
+    });
+
+    return Array.isArray(rows) && rows.length > 0 ? mapUserRow(rows[0]) : user;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  const users = state.users ?? [];
+  users.push(user);
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      users,
+    },
+  });
+  return user;
+}
+
+export async function getUserByEmail(email) {
+  const normalizedEmail = String(email ?? "").trim().toLowerCase();
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${usersTable}?email=eq.${encodeURIComponent(normalizedEmail)}&select=*`,
+      { method: "GET" },
+    );
+    return Array.isArray(rows) && rows.length > 0 ? mapUserRow(rows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  return (state.users ?? []).find((user) => user.email === normalizedEmail) ?? null;
+}
+
+export async function getUserById(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${usersTable}?id=eq.${encodeURIComponent(userId)}&select=*`,
+      { method: "GET" },
+    );
+    return Array.isArray(rows) && rows.length > 0 ? mapUserRow(rows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  return (state.users ?? []).find((user) => user.id === userId) ?? null;
+}
+
+export async function updateUserProfile(userId, value) {
+  const existing = await getUserById(userId);
+
+  if (!existing) {
+    return null;
+  }
+
+  const nextUser = {
+    ...existing,
+    displayName: normalizeNickname(value?.displayName, existing.displayName),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(`${usersTable}?id=eq.${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        display_name: nextUser.displayName,
+        updated_at: nextUser.updatedAt,
+      }),
+    });
+    return Array.isArray(rows) && rows.length > 0 ? mapUserRow(rows[0]) : nextUser;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  const users = (state.users ?? []).map((user) => (user.id === userId ? nextUser : user));
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: { ...state, users },
+  });
+  return nextUser;
+}
+
+export async function getPairingForUser(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  if (isSupabaseConfigured()) {
+    const ownerRows = await supabaseRequest(
+      `${pairingsTable}?owner_user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=1&select=*`,
+      { method: "GET" },
+    );
+
+    if (Array.isArray(ownerRows) && ownerRows.length > 0) {
+      return mapPairingRow(ownerRows[0]);
+    }
+
+    const partnerRows = await supabaseRequest(
+      `${pairingsTable}?partner_user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=1&select=*`,
+      { method: "GET" },
+    );
+
+    return Array.isArray(partnerRows) && partnerRows.length > 0 ? mapPairingRow(partnerRows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  const pairings = state.userPairings ?? [];
+  return pairings.find((pairing) => pairing.ownerUserId === userId || pairing.partnerUserId === userId) ?? null;
+}
+
+export async function upsertPairing(value) {
+  const pairing = {
+    id: value?.id,
+    code: String(value?.code ?? "").trim().toUpperCase(),
+    ownerUserId: value?.ownerUserId ?? null,
+    partnerUserId: value?.partnerUserId ?? null,
+    status: value?.status ?? "pending",
+    goalKm: Number(value?.goalKm ?? defaultGoalKm),
+    createdAt: value?.createdAt ?? new Date().toISOString(),
+    pairedAt: value?.pairedAt ?? null,
+    updatedAt: value?.updatedAt ?? new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(`${pairingsTable}?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          id: pairing.id,
+          code: pairing.code,
+          owner_user_id: pairing.ownerUserId,
+          partner_user_id: pairing.partnerUserId,
+          status: pairing.status,
+          goal_km: pairing.goalKm,
+          created_at: pairing.createdAt,
+          paired_at: pairing.pairedAt,
+          updated_at: pairing.updatedAt,
+        },
+      ]),
+    });
+    return Array.isArray(rows) && rows.length > 0 ? mapPairingRow(rows[0]) : pairing;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  const pairings = state.userPairings ?? [];
+  const index = pairings.findIndex((item) => item.id === pairing.id);
+
+  if (index >= 0) {
+    pairings[index] = pairing;
+  } else {
+    pairings.push(pairing);
+  }
+
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: { ...state, userPairings: pairings },
+  });
+  return pairing;
+}
+
+export async function findPairingByCode(code) {
+  const normalizedCode = String(code ?? "").trim().toUpperCase();
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${pairingsTable}?code=eq.${encodeURIComponent(normalizedCode)}&limit=1&select=*`,
+      { method: "GET" },
+    );
+    return Array.isArray(rows) && rows.length > 0 ? mapPairingRow(rows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  return (state.userPairings ?? []).find((pairing) => pairing.code === normalizedCode) ?? null;
+}
+
+export async function getUserStravaAppConfig(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${userStravaAppsTable}?user_id=eq.${encodeURIComponent(userId)}&select=*`,
+      { method: "GET" },
+    );
+    return Array.isArray(rows) && rows.length > 0 ? mapUserStravaAppRow(rows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  return state.userStravaApps?.[userId] ?? null;
+}
+
+export async function setUserStravaAppConfig(userId, value) {
+  const normalized = {
+    userId,
+    clientId: String(value?.clientId ?? "").trim(),
+    clientSecret: String(value?.clientSecret ?? "").trim(),
+    redirectUri: String(value?.redirectUri ?? "").trim(),
+    updatedAt: value?.updatedAt ?? new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(`${userStravaAppsTable}?on_conflict=user_id`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          user_id: userId,
+          client_id: normalized.clientId,
+          client_secret: normalized.clientSecret,
+          redirect_uri: normalized.redirectUri,
+          updated_at: normalized.updatedAt,
+        },
+      ]),
+    });
+    return Array.isArray(rows) && rows.length > 0 ? mapUserStravaAppRow(rows[0]) : normalized;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      userStravaApps: {
+        ...(state.userStravaApps ?? {}),
+        [userId]: normalized,
+      },
+    },
+  });
+  return normalized;
+}
+
+export async function getUserTokenEntry(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${userStravaTokensTable}?user_id=eq.${encodeURIComponent(userId)}&select=*`,
+      { method: "GET" },
+    );
+    return Array.isArray(rows) && rows.length > 0 ? mapUserTokenRow(rows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  return state.userStravaTokens?.[userId] ?? null;
+}
+
+export async function setUserTokenEntry(userId, entry) {
+  const normalized = {
+    userId,
+    accessToken: entry.accessToken,
+    refreshToken: entry.refreshToken,
+    expiresAt: entry.expiresAt,
+    scope: entry.scope ?? "",
+    athlete: entry.athlete ?? null,
+    updatedAt: entry.updatedAt ?? new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(`${userStravaTokensTable}?on_conflict=user_id`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          user_id: userId,
+          access_token: normalized.accessToken,
+          refresh_token: normalized.refreshToken,
+          expires_at: normalized.expiresAt,
+          scope: normalized.scope,
+          athlete_id: normalized.athlete?.id ?? null,
+          athlete_firstname: normalized.athlete?.firstname ?? "",
+          athlete_lastname: normalized.athlete?.lastname ?? "",
+          athlete_profile: normalized.athlete?.profile ?? "",
+          updated_at: normalized.updatedAt,
+        },
+      ]),
+    });
+    return Array.isArray(rows) && rows.length > 0 ? mapUserTokenRow(rows[0]) : normalized;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      userStravaTokens: {
+        ...(state.userStravaTokens ?? {}),
+        [userId]: normalized,
+      },
+    },
+  });
+  return normalized;
+}
+
+export async function deleteUserTokenEntry(userId) {
+  if (!userId) {
+    return;
+  }
+
+  if (isSupabaseConfigured()) {
+    await supabaseRequest(`${userStravaTokensTable}?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+    return;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+  const next = { ...(state.userStravaTokens ?? {}) };
+  delete next[userId];
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      userStravaTokens: next,
+    },
+  });
+}
+
 function isSupabaseConfigured() {
   return Boolean(supabaseUrl && supabaseServiceRoleKey);
 }
@@ -379,6 +798,61 @@ function mapStravaAppRow(row) {
     clientId: row.client_id ?? "",
     clientSecret: row.client_secret ?? "",
     redirectUri: row.redirect_uri ?? "",
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+function mapUserRow(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    passwordSalt: row.password_salt,
+    displayName: row.display_name ?? "Runner",
+    createdAt: row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+function mapPairingRow(row) {
+  return {
+    id: row.id,
+    code: row.code,
+    ownerUserId: row.owner_user_id,
+    partnerUserId: row.partner_user_id ?? null,
+    status: row.status ?? "pending",
+    goalKm: Number(row.goal_km ?? defaultGoalKm),
+    createdAt: row.created_at ?? null,
+    pairedAt: row.paired_at ?? null,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+function mapUserStravaAppRow(row) {
+  return {
+    userId: row.user_id,
+    clientId: row.client_id ?? "",
+    clientSecret: row.client_secret ?? "",
+    redirectUri: row.redirect_uri ?? "",
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+function mapUserTokenRow(row) {
+  return {
+    userId: row.user_id,
+    accessToken: row.access_token,
+    refreshToken: row.refresh_token,
+    expiresAt: row.expires_at,
+    scope: row.scope ?? "",
+    athlete: row.athlete_id
+      ? {
+          id: row.athlete_id,
+          firstname: row.athlete_firstname ?? "",
+          lastname: row.athlete_lastname ?? "",
+          profile: row.athlete_profile ?? "",
+        }
+      : null,
     updatedAt: row.updated_at ?? null,
   };
 }

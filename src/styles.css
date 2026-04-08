@@ -532,6 +532,21 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.auth-gate-card {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.auth-mode-switcher {
+  justify-content: start;
+  width: fit-content;
+}
+
+.auth-form-grid {
+  display: grid;
+  gap: 14px;
+}
+
 .runner-header,
 .summary-header {
   display: flex;

@@ -2,17 +2,21 @@ import { createReadStream } from "node:fs";
 import { access } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { clearSessionCookie, createSessionCookie, readSessionTokenFromRequest, verifySessionToken } from "./backend/auth.mjs";
 import {
-  createPairingCode,
-  disconnectAthlete,
+  createPairingCodeForUser,
+  disconnectUserStrava,
   env,
-  exchangeCode,
+  exchangeCodeForUser,
   getContentType,
-  getDashboard,
-  joinPairingCode,
-  saveGoal,
-  saveNicknames,
-  saveStravaAppCredentials,
+  getDashboardForUser,
+  getSessionUser,
+  joinPairingCodeForUser,
+  loginUser,
+  registerUser,
+  saveGoalForUser,
+  saveUserDisplayName,
+  saveUserStravaAppCredentials,
 } from "./backend/core.mjs";
 
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 8787);
@@ -36,42 +40,93 @@ const server = http.createServer(async (request, response) => {
       return sendJson(response, 200, { ok: true });
     }
 
+    if (url.pathname === "/api/auth/register" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const auth = await registerUser(body);
+      response.setHeader("Set-Cookie", createSessionCookie(auth.token));
+      return sendJson(response, 200, { user: auth.user });
+    }
+
+    if (url.pathname === "/api/auth/login" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const auth = await loginUser(body);
+      response.setHeader("Set-Cookie", createSessionCookie(auth.token));
+      return sendJson(response, 200, { user: auth.user });
+    }
+
+    if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+      response.setHeader("Set-Cookie", clearSessionCookie());
+      return sendJson(response, 200, { ok: true });
+    }
+
+    if (url.pathname === "/api/auth/me" && request.method === "GET") {
+      const session = verifySessionToken(readSessionTokenFromRequest(request));
+      const user = await getSessionUser(session);
+      return sendJson(response, 200, { user });
+    }
+
+    const session = verifySessionToken(readSessionTokenFromRequest(request));
+    const user = await getSessionUser(session);
+
     if (url.pathname === "/api/dashboard" && request.method === "GET") {
-      return sendJson(response, 200, await getDashboard(url.searchParams.get("date") ?? undefined));
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
+      return sendJson(response, 200, await getDashboardForUser(user.id, url.searchParams.get("date") ?? undefined));
     }
 
     if (url.pathname === "/api/goal" && request.method === "PUT") {
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
       const body = await readJsonBody(request);
-      return sendJson(response, 200, await saveGoal(body?.goalKm));
+      return sendJson(response, 200, await saveGoalForUser(user.id, body?.goalKm));
     }
 
     if (url.pathname === "/api/nicknames" && request.method === "PUT") {
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
       const body = await readJsonBody(request);
-      return sendJson(response, 200, await saveNicknames(body));
+      return sendJson(response, 200, await saveUserDisplayName(user.id, body));
     }
 
     if (url.pathname === "/api/strava/apps" && request.method === "PUT") {
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
       const body = await readJsonBody(request);
-      return sendJson(response, 200, await saveStravaAppCredentials(body));
+      return sendJson(response, 200, await saveUserStravaAppCredentials(user.id, body));
     }
 
     if (url.pathname === "/api/pairing/create" && request.method === "POST") {
-      return sendJson(response, 200, await createPairingCode());
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
+      return sendJson(response, 200, await createPairingCodeForUser(user.id));
     }
 
     if (url.pathname === "/api/pairing/join" && request.method === "POST") {
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
       const body = await readJsonBody(request);
-      return sendJson(response, 200, await joinPairingCode(body?.code));
+      return sendJson(response, 200, await joinPairingCodeForUser(user.id, body?.code));
     }
 
     if (url.pathname === "/api/strava/exchange" && request.method === "POST") {
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
       const body = await readJsonBody(request);
-      return sendJson(response, 200, await exchangeCode(body));
+      return sendJson(response, 200, await exchangeCodeForUser(user.id, body));
     }
 
     if (url.pathname === "/api/strava/disconnect" && request.method === "POST") {
-      const body = await readJsonBody(request);
-      return sendJson(response, 200, await disconnectAthlete(body?.athleteKey));
+      if (!user) {
+        return sendJson(response, 401, { error: "Authentication required." });
+      }
+      return sendJson(response, 200, await disconnectUserStrava(user.id));
     }
 
     return serveApp(url.pathname, response);
@@ -93,6 +148,7 @@ function setCorsHeaders(request, response) {
     response.setHeader("Access-Control-Allow-Origin", origin);
   }
 
+  response.setHeader("Access-Control-Allow-Credentials", "true");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
