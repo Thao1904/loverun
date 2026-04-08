@@ -863,10 +863,12 @@ function GoalCard({
   goalKm: number;
   onClick: () => void;
 }) {
+  const safeGoalKm = toSafeNumber(goalKm);
+
   return (
     <button className="goal-card-button" type="button" onClick={onClick}>
       <span>{copy.goalInputLabel}</span>
-      <strong>{goalKm}{copy.kmUnit}</strong>
+      <strong>{safeGoalKm}{copy.kmUnit}</strong>
       <em>{copy.editGoalHint}</em>
     </button>
   );
@@ -1007,18 +1009,21 @@ function StatsPanel({
   goalKm: number;
   totalKm: number;
 }) {
+  const safeGoalKm = toSafeNumber(goalKm);
+  const safeTotalKm = toSafeNumber(totalKm);
+
   return (
     <div className="heart-stats">
       <div>
         <span>{copy.totalRunLabel}</span>
         <strong>
-          {totalKm.toFixed(1)} {copy.kmUnit}
+          {safeTotalKm.toFixed(1)} {copy.kmUnit}
         </strong>
       </div>
       <div>
         <span>{copy.toCompleteLabel}</span>
         <strong>
-          {Math.max(goalKm - totalKm, 0).toFixed(1)} {copy.kmUnit}
+          {Math.max(safeGoalKm - safeTotalKm, 0).toFixed(1)} {copy.kmUnit}
         </strong>
       </div>
     </div>
@@ -1038,6 +1043,8 @@ function DemoRunnerCard({
   runner: DemoRunnerState;
   onChange: (athleteKey: AthleteKey, key: keyof DemoRunnerState, value: number | boolean) => void;
 }) {
+  const safeDistanceKm = toSafeNumber(runner.distanceKm);
+
   return (
     <article className="runner-card">
       <div className="runner-header">
@@ -1053,7 +1060,7 @@ function DemoRunnerCard({
           </label>
         </div>
         <span className="runner-badge">
-          {runner.distanceKm.toFixed(1)} {copy.kmUnit}
+          {safeDistanceKm.toFixed(1)} {copy.kmUnit}
         </span>
       </div>
 
@@ -1140,6 +1147,7 @@ function RunnerCard({
 }) {
   const athleteSnapshot = dashboard?.athletes[athleteKey];
   const metrics = athleteSnapshot?.summary ?? emptyRunnerMetrics();
+  const safeDistanceKm = toSafeNumber(metrics.distanceKm);
   const fullName = athleteSnapshot?.athlete
     ? `${athleteSnapshot.athlete.firstname} ${athleteSnapshot.athlete.lastname}`.trim()
     : name;
@@ -1154,7 +1162,7 @@ function RunnerCard({
           </p>
         </div>
         <span className="runner-badge">
-          {metrics.distanceKm.toFixed(1)} {copy.kmUnit}
+          {safeDistanceKm.toFixed(1)} {copy.kmUnit}
         </span>
       </div>
       <div className="runner-metrics">
@@ -1323,7 +1331,10 @@ function HeartMeter({
   goalKm: number;
   unitLabel: string;
 }) {
-  const normalizedCompletion = Math.min(Math.max(completion, 0), 1);
+  const safeCompletion = toSafeNumber(completion);
+  const safeTotalKm = toSafeNumber(totalKm);
+  const safeGoalKm = toSafeNumber(goalKm);
+  const normalizedCompletion = Math.min(Math.max(safeCompletion, 0), 1);
   const progressLength = Number((normalizedCompletion * 100).toFixed(3));
 
   return (
@@ -1355,7 +1366,7 @@ function HeartMeter({
       <div className="heart-center">
         <strong>{Math.round(normalizedCompletion * 100)}%</strong>
         <span>
-          {totalKm.toFixed(1)} / {goalKm.toFixed(1)} {unitLabel}
+          {safeTotalKm.toFixed(1)} / {safeGoalKm.toFixed(1)} {unitLabel}
         </span>
       </div>
     </div>
@@ -1631,15 +1642,16 @@ function buildEcgPath(heartRates: number[]) {
 }
 
 function buildSegmentsFromDistances(youDistanceKm: number, partnerDistanceKm: number, goalKm: number): HeartSegments {
-  const safeYou = Math.max(youDistanceKm, 0);
-  const safePartner = Math.max(partnerDistanceKm, 0);
+  const safeYou = Math.max(toSafeNumber(youDistanceKm), 0);
+  const safePartner = Math.max(toSafeNumber(partnerDistanceKm), 0);
+  const safeGoalKm = Math.max(toSafeNumber(goalKm), 0);
   const total = safeYou + safePartner;
 
-  if (total <= 0 || goalKm <= 0) {
+  if (total <= 0 || safeGoalKm <= 0) {
     return { you: 0, partner: 0 };
   }
 
-  if (total >= goalKm) {
+  if (total >= safeGoalKm) {
     return {
       you: safeYou / total,
       partner: safePartner / total,
@@ -1647,9 +1659,13 @@ function buildSegmentsFromDistances(youDistanceKm: number, partnerDistanceKm: nu
   }
 
   return {
-    you: safeYou / goalKm,
-    partner: safePartner / goalKm,
+    you: safeYou / safeGoalKm,
+    partner: safePartner / safeGoalKm,
   };
+}
+
+function toSafeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 export default App;
