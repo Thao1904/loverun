@@ -12,6 +12,7 @@ import {
   joinPairingCode,
   saveGoal,
   saveNicknames,
+  saveStravaAppCredentials,
 } from "./backend/core.mjs";
 
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 8787);
@@ -47,6 +48,11 @@ const server = http.createServer(async (request, response) => {
     if (url.pathname === "/api/nicknames" && request.method === "PUT") {
       const body = await readJsonBody(request);
       return sendJson(response, 200, await saveNicknames(body));
+    }
+
+    if (url.pathname === "/api/strava/apps" && request.method === "PUT") {
+      const body = await readJsonBody(request);
+      return sendJson(response, 200, await saveStravaAppCredentials(body));
     }
 
     if (url.pathname === "/api/pairing/create" && request.method === "POST") {

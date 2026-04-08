@@ -7,7 +7,7 @@ Minimal mobile-first dashboard for a couple's shared Strava running goal.
 - Daily couple dashboard in English with a Vietnamese toggle in the top-right corner.
 - Shared heart progress based on the total kilometers run by both people today.
 - Backend token exchange for two Strava connections: `you` and `partner`.
-- Persistent shared goal and Strava tokens with Supabase support.
+- Persistent shared goal, Strava app credentials, and Strava user tokens with Supabase support.
 - Automatic Strava token refresh and live daily fetch for distance, average heart rate, calories, and heart-rate streams.
 - Estimated steps based on cadence because Strava does not expose direct step totals in the public API.
 - Locked "heartbeat song" area that unlocks after the shared goal is complete.
@@ -16,19 +16,24 @@ Minimal mobile-first dashboard for a couple's shared Strava running goal.
 
 1. Install dependencies with `npm install`.
 2. Copy `.env.example` to `.env`.
-3. Set `VITE_STRAVA_CLIENT_ID`.
-4. Set `STRAVA_CLIENT_SECRET`.
-5. Set `VITE_STRAVA_REDIRECT_URI` to your dashboard URL, for example `http://localhost:5173/dashboard`.
-6. For local dev, set `VITE_API_BASE_URL=http://localhost:8787`. For Render deployment, leave it empty so the frontend uses same-origin `/api`.
-7. Start both frontend and backend with `npm run dev`.
+3. For local dev, set `VITE_API_BASE_URL=http://localhost:8787`. For Render deployment, leave it empty so the frontend uses same-origin `/api`.
+4. Start both frontend and backend with `npm run dev`.
 
 ## Persistent storage setup
 
-### Supabase for shared goal and Strava tokens
+### Supabase for shared goal, Strava app credentials, and Strava tokens
 
 Create these tables in Supabase:
 
 ```sql
+create table if not exists public.strava_app_credentials (
+  athlete_key text primary key,
+  client_id text not null,
+  client_secret text not null,
+  redirect_uri text not null,
+  updated_at timestamptz default now()
+);
+
 create table if not exists public.strava_tokens (
   athlete_key text primary key,
   access_token text not null,
@@ -53,6 +58,7 @@ Then set:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STRAVA_APPS_TABLE=strava_app_credentials`
 - `SUPABASE_STRAVA_TOKENS_TABLE=strava_tokens`
 - `SUPABASE_SETTINGS_TABLE=app_settings`
 
@@ -63,23 +69,21 @@ Then set:
 1. Push this repo to GitHub. It is already available at [Thao1904/loverun](https://github.com/Thao1904/loverun).
 2. In Render, create a new Blueprint or Web Service from that repo.
 3. Use the included [render.yaml](/Users/mee/Downloads/loverun/render.yaml) to create a Node web service on Render free.
-4. Because shared goal and tokens now live in Supabase, you can stay on Render free and do not need Render disk persistence.
+4. Because shared goal, Strava app credentials, and tokens now live in Supabase, you can stay on Render free and do not need Render disk persistence.
 5. Set these environment variables in Render:
    `APP_WEB_ORIGIN=https://your-service-name.onrender.com`
-   `VITE_STRAVA_CLIENT_ID=...`
-   `STRAVA_CLIENT_SECRET=...`
-   `VITE_STRAVA_REDIRECT_URI=https://your-service-name.onrender.com/dashboard`
    plus the Supabase env vars above
-6. After the first deploy, open `/dashboard` and connect both Strava accounts.
+6. After the first deploy, open `/dashboard`, save the Strava app credentials for `you` and/or `partner`, then connect those Strava accounts.
 
 ## Strava authorization notes
 
 - In Strava API settings, use your Render domain as the callback domain.
-- Keep the redirect URI on the dashboard, for example `https://your-service-name.onrender.com/dashboard`.
-- Frontend initiates authorization on `/dashboard` and receives the returned `code` there.
+- For each runner, save the exact redirect URI you want to use, for example `https://your-service-name.onrender.com/dashboard`, in the app's Strava credentials modal.
+- Frontend initiates authorization on `/dashboard` using the saved `client_id` and `redirect_uri` for that runner and receives the returned `code` there.
 - The frontend then posts `code` plus `state=you|partner` to the backend endpoint `/api/strava/exchange`.
-- Local backend stores refresh/access tokens in `./data/strava-tokens.json`.
-- With Supabase configured, goal and tokens persist independently of Render restarts.
+- Backend exchanges and refreshes tokens using the stored Strava app credentials for that runner.
+- Local backend stores fallback credentials/tokens in `./data/app-state.json` and `./data/strava-tokens.json` if Supabase is not configured.
+- With Supabase configured, goal, credentials, and tokens persist independently of Render restarts.
 - Suggested scopes for this dashboard: `read`, `profile:read_all`, `activity:read_all`.
 
 ## Live data behavior

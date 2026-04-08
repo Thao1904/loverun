@@ -16,12 +16,6 @@ services:
         value: ""
       - key: APP_WEB_ORIGIN
         sync: false
-      - key: VITE_STRAVA_CLIENT_ID
-        sync: false
-      - key: STRAVA_CLIENT_SECRET
-        sync: false
-      - key: VITE_STRAVA_REDIRECT_URI
-        sync: false
       - key: APP_TIMEZONE
         value: America/New_York
       - key: DEFAULT_SHARED_GOAL_KM
@@ -32,5 +26,7 @@ services:
         sync: false
       - key: SUPABASE_STRAVA_TOKENS_TABLE
         value: strava_tokens
+      - key: SUPABASE_STRAVA_APPS_TABLE
+        value: strava_app_credentials
       - key: SUPABASE_SETTINGS_TABLE
         value: app_settings

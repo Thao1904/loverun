@@ -20,6 +20,7 @@ const supabaseUrl = process.env.SUPABASE_URL ?? "";
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const tokensTable = process.env.SUPABASE_STRAVA_TOKENS_TABLE ?? "strava_tokens";
 const settingsTable = process.env.SUPABASE_SETTINGS_TABLE ?? "app_settings";
+const stravaAppsTable = process.env.SUPABASE_STRAVA_APPS_TABLE ?? "strava_app_credentials";
 const defaultNicknames = {
   you: "You",
   partner: "Partner",
@@ -221,6 +222,102 @@ export async function writePairingState(value) {
   });
 }
 
+export async function readStravaAppConfigs() {
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(`${stravaAppsTable}?select=*`, {
+      method: "GET",
+    });
+
+    if (Array.isArray(rows)) {
+      return rows.reduce(
+        (result, row) => ({
+          ...result,
+          [row.athlete_key]: mapStravaAppRow(row),
+        }),
+        {},
+      );
+    }
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  return state.stravaApps ?? {};
+}
+
+export async function getStravaAppConfig(athleteKey) {
+  if (isSupabaseConfigured()) {
+    const rows = await supabaseRequest(
+      `${stravaAppsTable}?athlete_key=eq.${encodeURIComponent(athleteKey)}&select=*`,
+      {
+        method: "GET",
+      },
+    );
+
+    return Array.isArray(rows) && rows.length > 0 ? mapStravaAppRow(rows[0]) : null;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  return state.stravaApps?.[athleteKey] ?? null;
+}
+
+export async function setStravaAppConfig(athleteKey, value) {
+  const normalized = {
+    athleteKey,
+    clientId: String(value?.clientId ?? "").trim(),
+    clientSecret: String(value?.clientSecret ?? "").trim(),
+    redirectUri: String(value?.redirectUri ?? "").trim(),
+    updatedAt: value?.updatedAt ?? new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    await supabaseRequest(`${stravaAppsTable}?on_conflict=athlete_key`, {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([
+        {
+          athlete_key: athleteKey,
+          client_id: normalized.clientId,
+          client_secret: normalized.clientSecret,
+          redirect_uri: normalized.redirectUri,
+          updated_at: normalized.updatedAt,
+        },
+      ]),
+    });
+    return normalized;
+  }
+
+  const state = await readStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    fallback: {},
+  });
+
+  await writeStoredJson({
+    blobPath: appStateBlobPath,
+    filePath: appStateFile,
+    value: {
+      ...state,
+      stravaApps: {
+        ...(state.stravaApps ?? {}),
+        [athleteKey]: normalized,
+      },
+    },
+  });
+
+  return normalized;
+}
+
 export async function getTokenEntry(athleteKey) {
   if (isSupabaseConfigured()) {
     const rows = await supabaseRequest(
@@ -274,6 +371,16 @@ function isSupabaseConfigured() {
 function normalizeNickname(value, fallback) {
   const normalized = String(value ?? "").trim();
   return normalized.length > 0 ? normalized.slice(0, 24) : fallback;
+}
+
+function mapStravaAppRow(row) {
+  return {
+    athleteKey: row.athlete_key,
+    clientId: row.client_id ?? "",
+    clientSecret: row.client_secret ?? "",
+    redirectUri: row.redirect_uri ?? "",
+    updatedAt: row.updated_at ?? null,
+  };
 }
 
 async function supabaseRequest(pathname, init) {

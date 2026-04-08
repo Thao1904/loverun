@@ -540,6 +540,16 @@ a {
   gap: 12px;
 }
 
+.auth-runner-action {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-runner-action strong {
+  font-size: 1rem;
+  color: #2f2530;
+}
+
 .runner-badge,
 .progress-pill {
   color: var(--accent-strong);
@@ -844,6 +854,11 @@ a {
   color: white;
   font-weight: 700;
   text-align: center;
+}
+
+.connect-button-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .song-card {

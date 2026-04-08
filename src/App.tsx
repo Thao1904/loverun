@@ -7,6 +7,7 @@ import {
   fetchDashboard,
   joinPairingCode as joinPairingCodeRequest,
   saveNicknames as saveNicknamesRequest,
+  saveStravaAppCredentials as saveStravaAppCredentialsRequest,
   saveSharedGoal,
   type AthleteKey,
   type DashboardResponse,
@@ -39,6 +40,13 @@ type DemoRunnerState = {
 type NicknameState = {
   you: string;
   partner: string;
+};
+
+type StravaAppFormState = {
+  athleteKey: AthleteKey;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
 };
 
 type Route = "dashboard" | "demo";
@@ -79,6 +87,14 @@ function App() {
   const [savedNicknames, setSavedNicknames] = useState<NicknameState>(getInitialNicknames(initialLanguage));
   const [isSavingNames, setIsSavingNames] = useState(false);
   const [isNamesModalOpen, setIsNamesModalOpen] = useState(false);
+  const [isStravaAppModalOpen, setIsStravaAppModalOpen] = useState(false);
+  const [isSavingStravaApp, setIsSavingStravaApp] = useState(false);
+  const [stravaAppForm, setStravaAppForm] = useState<StravaAppFormState>({
+    athleteKey: "you",
+    clientId: "",
+    clientSecret: "",
+    redirectUri: `${window.location.origin}/dashboard`,
+  });
   const [pairingCodeInput, setPairingCodeInput] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [demoSoundEnabled, setDemoSoundEnabled] = useState(false);
@@ -288,6 +304,17 @@ function App() {
           onClose={() => setIsNamesModalOpen(false)}
         />
       ) : null}
+
+      {isStravaAppModalOpen ? (
+        <StravaAppModal
+          copy={copy}
+          form={stravaAppForm}
+          isSaving={isSavingStravaApp}
+          onChange={setStravaAppForm}
+          onSave={() => void handleSaveStravaAppCredentials()}
+          onClose={() => setIsStravaAppModalOpen(false)}
+        />
+      ) : null}
     </div>
   );
 
@@ -410,12 +437,22 @@ function App() {
           ) : null}
 
           <div className="auth-actions-grid">
-            <a className="connect-button" href={buildStravaAuthorizeUrl("you")}>
-              {copy.connectYou}
-            </a>
-            <a className="connect-button" href={buildStravaAuthorizeUrl("partner")}>
-              {copy.connectPartner}
-            </a>
+            <AuthRunnerAction
+              athleteKey="you"
+              copy={copy}
+              title={nicknames.you}
+              connectLabel={copy.connectYou}
+              config={dashboard?.stravaApps.you}
+              onConfigure={() => openStravaAppModal("you")}
+            />
+            <AuthRunnerAction
+              athleteKey="partner"
+              copy={copy}
+              title={nicknames.partner}
+              connectLabel={copy.connectPartner}
+              config={dashboard?.stravaApps.partner}
+              onConfigure={() => openStravaAppModal("partner")}
+            />
           </div>
 
           <InfoToggle summary={copy.moreDetails}>
@@ -575,12 +612,22 @@ function App() {
             </div>
           </div>
           <div className="auth-actions-grid">
-            <a className="connect-button" href={buildStravaAuthorizeUrl("you")}>
-              {copy.connectYou}
-            </a>
-            <a className="connect-button" href={buildStravaAuthorizeUrl("partner")}>
-              {copy.connectPartner}
-            </a>
+            <AuthRunnerAction
+              athleteKey="you"
+              copy={copy}
+              title={nicknames.you}
+              connectLabel={copy.connectYou}
+              config={dashboard?.stravaApps.you}
+              onConfigure={() => openStravaAppModal("you")}
+            />
+            <AuthRunnerAction
+              athleteKey="partner"
+              copy={copy}
+              title={nicknames.partner}
+              connectLabel={copy.connectPartner}
+              config={dashboard?.stravaApps.partner}
+              onConfigure={() => openStravaAppModal("partner")}
+            />
           </div>
           <InfoToggle summary={copy.moreDetails}>
             <ol className="instruction-list">
@@ -750,6 +797,40 @@ function App() {
     } finally {
       setIsSavingNames(false);
     }
+  }
+
+  async function handleSaveStravaAppCredentials() {
+    setIsSavingStravaApp(true);
+
+    try {
+      const saved = await saveStravaAppCredentialsRequest(stravaAppForm);
+      setDashboard((current) =>
+        current
+          ? {
+              ...current,
+              stravaApps: {
+                ...current.stravaApps,
+                [stravaAppForm.athleteKey]: saved,
+              },
+            }
+          : current,
+      );
+      setStravaAppForm((current) => ({ ...current, clientSecret: "" }));
+      setIsStravaAppModalOpen(false);
+    } finally {
+      setIsSavingStravaApp(false);
+    }
+  }
+
+  function openStravaAppModal(athleteKey: AthleteKey) {
+    const current = dashboard?.stravaApps[athleteKey];
+    setStravaAppForm({
+      athleteKey,
+      clientId: current?.clientId ?? "",
+      clientSecret: "",
+      redirectUri: current?.redirectUri ?? `${window.location.origin}/dashboard`,
+    });
+    setIsStravaAppModalOpen(true);
   }
 
   async function handleCreatePairingCode() {
@@ -1101,6 +1182,121 @@ function MetricBox({ label, value }: { label: string; value: string }) {
   );
 }
 
+function AuthRunnerAction({
+  athleteKey,
+  copy,
+  title,
+  connectLabel,
+  config,
+  onConfigure,
+}: {
+  athleteKey: AthleteKey;
+  copy: Copy;
+  title: string;
+  connectLabel: string;
+  config:
+    | {
+        configured: boolean;
+        clientId: string;
+        redirectUri: string;
+        updatedAt: string | null;
+      }
+    | undefined;
+  onConfigure: () => void;
+}) {
+  const href = buildStravaAuthorizeUrl(athleteKey, config);
+
+  return (
+    <div className="auth-runner-action">
+      <strong>{title}</strong>
+      <button className="ghost-button" type="button" onClick={onConfigure}>
+        {copy.setCredentials}
+      </button>
+      <a
+        className={`connect-button ${!config?.configured ? "connect-button-disabled" : ""}`}
+        href={href}
+        aria-disabled={!config?.configured}
+        onClick={(event) => {
+          if (!config?.configured) {
+            event.preventDefault();
+            onConfigure();
+          }
+        }}
+      >
+        {connectLabel}
+      </a>
+    </div>
+  );
+}
+
+function StravaAppModal({
+  copy,
+  form,
+  isSaving,
+  onChange,
+  onSave,
+  onClose,
+}: {
+  copy: Copy;
+  form: StravaAppFormState;
+  isSaving: boolean;
+  onChange: (value: StravaAppFormState) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="goal-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="strava-app-modal-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="nickname-modal-header">
+          <div>
+            <p className="eyebrow">{form.athleteKey === "you" ? copy.youLabel : copy.partnerLabel}</p>
+            <h3 id="strava-app-modal-title">{copy.stravaCredentialsTitle}</h3>
+          </div>
+          <button className="ghost-button nickname-close-button" type="button" onClick={onClose}>
+            {copy.closeModal}
+          </button>
+        </div>
+        <p className="summary-note">{copy.stravaCredentialsDescription}</p>
+        <label className="nickname-field">
+          <span>{copy.clientIdLabel}</span>
+          <input
+            type="text"
+            value={form.clientId}
+            onChange={(event) => onChange({ ...form, clientId: event.target.value })}
+          />
+        </label>
+        <label className="nickname-field">
+          <span>{copy.clientSecretLabel}</span>
+          <input
+            type="password"
+            value={form.clientSecret}
+            onChange={(event) => onChange({ ...form, clientSecret: event.target.value })}
+          />
+        </label>
+        <label className="nickname-field">
+          <span>{copy.redirectUriLabel}</span>
+          <input
+            type="url"
+            value={form.redirectUri}
+            onChange={(event) => onChange({ ...form, redirectUri: event.target.value })}
+          />
+        </label>
+        <div className="nickname-modal-actions">
+          <button className="ghost-button" type="button" onClick={onSave} disabled={isSaving}>
+            {isSaving ? copy.credentialsSaving : copy.saveCredentials}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function InfoToggle({
   summary,
   children,
@@ -1307,14 +1503,22 @@ function navigateTo(route: Route, setRoute: (route: Route) => void) {
   setRoute(route);
 }
 
-function buildStravaAuthorizeUrl(athleteKey: AthleteKey) {
-  const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID ?? "YOUR_CLIENT_ID";
-  const redirectUri =
-    import.meta.env.VITE_STRAVA_REDIRECT_URI ?? `${window.location.origin}/dashboard`;
+function buildStravaAuthorizeUrl(
+  athleteKey: AthleteKey,
+  config?: {
+    configured: boolean;
+    clientId: string;
+    redirectUri: string;
+    updatedAt: string | null;
+  },
+) {
+  if (!config?.configured || !config.clientId || !config.redirectUri) {
+    return "#";
+  }
 
   const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
+    client_id: config.clientId,
+    redirect_uri: config.redirectUri,
     response_type: "code",
     approval_prompt: "force",
     scope: stravaScopes.join(","),

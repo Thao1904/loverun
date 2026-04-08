@@ -27,6 +27,15 @@ export type AthleteSnapshot = {
 export type DashboardResponse = {
   date: string;
   goalKm: number;
+  stravaApps: Record<
+    AthleteKey,
+    {
+      configured: boolean;
+      clientId: string;
+      redirectUri: string;
+      updatedAt: string | null;
+    }
+  >;
   nicknames: {
     you: string;
     partner: string;
@@ -82,6 +91,18 @@ export async function saveSharedGoal(goalKm: number) {
 
 export async function saveNicknames(payload: { you: string; partner: string }) {
   return requestJson<DashboardResponse["nicknames"]>(`${apiBaseUrl}/api/nicknames`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function saveStravaAppCredentials(payload: {
+  athleteKey: AthleteKey;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}) {
+  return requestJson<DashboardResponse["stravaApps"][AthleteKey]>(`${apiBaseUrl}/api/strava/apps`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });

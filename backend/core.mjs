@@ -2,10 +2,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   deleteTokenEntry,
+  getStravaAppConfig,
   getTokenEntry,
   readGoalState,
   readNicknameState,
   readPairingState,
+  readStravaAppConfigs,
+  setStravaAppConfig,
   setTokenEntry,
   writeGoalState,
   writeNicknameState,
@@ -18,8 +21,6 @@ const rootDir = path.resolve(__dirname, "..");
 const runTypes = new Set(["Run", "TrailRun", "VirtualRun"]);
 
 export const env = {
-  clientId: process.env.VITE_STRAVA_CLIENT_ID ?? process.env.STRAVA_CLIENT_ID ?? "",
-  clientSecret: process.env.STRAVA_CLIENT_SECRET ?? "",
   timezone: process.env.APP_TIMEZONE ?? "America/New_York",
   defaultGoalKm: Number(process.env.DEFAULT_SHARED_GOAL_KM ?? 18),
   distDir: path.resolve(rootDir, "dist"),
@@ -27,10 +28,11 @@ export const env = {
 
 export async function getDashboard(date) {
   const resolvedDate = date ?? getTodayDateString(env.timezone);
-  const [appState, pairing, nicknames] = await Promise.all([
+  const [appState, pairing, nicknames, stravaApps] = await Promise.all([
     readGoalState(),
     readPairingState(),
     readNicknameState(),
+    readStravaAppConfigs(),
   ]);
   const athletes = {
     you: await buildAthleteSnapshot("you", resolvedDate),
@@ -56,6 +58,10 @@ export async function getDashboard(date) {
     goalKm: appState.goalKm,
     pairing,
     nicknames,
+    stravaApps: {
+      you: toPublicStravaAppConfig(stravaApps.you),
+      partner: toPublicStravaAppConfig(stravaApps.partner),
+    },
     athletes,
     combined: {
       distanceKm: round(combinedDistanceKm),
@@ -68,6 +74,30 @@ export async function getDashboard(date) {
       ].slice(0, 256),
     },
   };
+}
+
+export async function saveStravaAppCredentials(payload) {
+  const athleteKey = normalizeAthleteKey(payload?.athleteKey);
+  const clientId = String(payload?.clientId ?? "").trim();
+  const clientSecret = String(payload?.clientSecret ?? "").trim();
+  const redirectUri = String(payload?.redirectUri ?? "").trim();
+
+  if (!athleteKey) {
+    throw new Error("athleteKey is required.");
+  }
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new Error("clientId, clientSecret, and redirectUri are required.");
+  }
+
+  const saved = await setStravaAppConfig(athleteKey, {
+    clientId,
+    clientSecret,
+    redirectUri,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return toPublicStravaAppConfig(saved);
 }
 
 export async function saveNicknames(nicknames) {
@@ -131,19 +161,17 @@ export async function saveGoal(goalKm) {
 }
 
 export async function exchangeCode({ athleteKey, code, scope }) {
-  if (!env.clientId || !env.clientSecret) {
-    throw new Error("Missing STRAVA credentials on the backend.");
-  }
-
   const normalizedAthleteKey = normalizeAthleteKey(athleteKey);
 
   if (!normalizedAthleteKey || !code) {
     throw new Error("athleteKey and code are required.");
   }
 
+  const stravaApp = await getRequiredStravaAppConfig(normalizedAthleteKey);
+
   const tokenPayload = new URLSearchParams({
-    client_id: env.clientId,
-    client_secret: env.clientSecret,
+    client_id: stravaApp.clientId,
+    client_secret: stravaApp.clientSecret,
     code,
     grant_type: "authorization_code",
   });
@@ -350,13 +378,11 @@ async function ensureAccessToken(athleteKey) {
     return tokenEntry.accessToken;
   }
 
-  if (!env.clientId || !env.clientSecret) {
-    throw new Error("Missing STRAVA backend credentials.");
-  }
+  const stravaApp = await getRequiredStravaAppConfig(athleteKey);
 
   const refreshPayload = new URLSearchParams({
-    client_id: env.clientId,
-    client_secret: env.clientSecret,
+    client_id: stravaApp.clientId,
+    client_secret: stravaApp.clientSecret,
     grant_type: "refresh_token",
     refresh_token: tokenEntry.refreshToken,
   });
@@ -497,4 +523,23 @@ function emptySummary() {
 function generatePairingCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+}
+
+async function getRequiredStravaAppConfig(athleteKey) {
+  const config = await getStravaAppConfig(athleteKey);
+
+  if (!config?.clientId || !config?.clientSecret || !config?.redirectUri) {
+    throw new Error(`Missing Strava app credentials for ${athleteKey}.`);
+  }
+
+  return config;
+}
+
+function toPublicStravaAppConfig(config) {
+  return {
+    configured: Boolean(config?.clientId && config?.redirectUri),
+    clientId: config?.clientId ?? "",
+    redirectUri: config?.redirectUri ?? "",
+    updatedAt: config?.updatedAt ?? null,
+  };
 }
