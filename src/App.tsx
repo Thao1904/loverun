@@ -886,7 +886,11 @@ function App() {
             });
 
       setAuthUser(auth.user);
-      await loadDashboardForUser(auth.user);
+      try {
+        await loadDashboardForUser(auth.user);
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "Could not load dashboard.");
+      }
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Authentication failed.");
     } finally {
