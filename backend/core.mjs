@@ -37,6 +37,7 @@ const runTypes = new Set(["Run", "TrailRun", "VirtualRun"]);
 export const env = {
   timezone: process.env.APP_TIMEZONE ?? "America/New_York",
   defaultGoalKm: Number(process.env.DEFAULT_SHARED_GOAL_KM ?? 18),
+  webOrigin: (process.env.APP_WEB_ORIGIN ?? "http://localhost:5173").replace(/\/$/, ""),
   distDir: path.resolve(rootDir, "dist"),
 };
 
@@ -252,9 +253,10 @@ export async function saveGoalForUser(userId, goalKm) {
 }
 
 export async function saveUserStravaAppCredentials(userId, payload) {
-  const clientId = String(payload?.clientId ?? "").trim();
-  const clientSecret = String(payload?.clientSecret ?? "").trim();
-  const redirectUri = String(payload?.redirectUri ?? "").trim();
+  const existingConfig = await getUserStravaAppConfig(userId);
+  const clientId = String(payload?.clientId ?? "").trim() || existingConfig?.clientId ?? "";
+  const clientSecret = String(payload?.clientSecret ?? "").trim() || existingConfig?.clientSecret ?? "";
+  const redirectUri = env.webOrigin;
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error("clientId, clientSecret, and redirectUri are required.");

@@ -62,6 +62,8 @@ type HeartSegments = {
   partner: number;
 };
 
+const productionWebOrigin = (import.meta.env.VITE_PUBLIC_WEB_ORIGIN ?? "https://loverun.onrender.com").replace(/\/$/, "");
+
 const defaultDemoState: Record<AthleteKey, DemoRunnerState> = {
   you: {
     connected: true,
@@ -107,7 +109,7 @@ function App() {
     athleteKey: "you",
     clientId: "",
     clientSecret: "",
-    redirectUri: `${window.location.origin}/dashboard`,
+    redirectUri: getDefaultRedirectUri(),
   });
   const [pairingCodeInput, setPairingCodeInput] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -962,7 +964,7 @@ function App() {
       athleteKey,
       clientId: current?.clientId ?? "",
       clientSecret: "",
-      redirectUri: current?.redirectUri ?? `${window.location.origin}/dashboard`,
+      redirectUri: current?.redirectUri ?? getDefaultRedirectUri(),
     });
     setIsStravaAppModalOpen(true);
   }
@@ -1417,6 +1419,7 @@ function StravaAppModal({
           <span>{copy.clientSecretLabel}</span>
           <input
             type="password"
+            placeholder="Leave blank to keep your saved secret"
             value={form.clientSecret}
             onChange={(event) => onChange({ ...form, clientSecret: event.target.value })}
           />
@@ -1426,7 +1429,7 @@ function StravaAppModal({
           <input
             type="url"
             value={form.redirectUri}
-            onChange={(event) => onChange({ ...form, redirectUri: event.target.value })}
+            readOnly
           />
         </label>
         <div className="nickname-modal-actions">
@@ -1640,6 +1643,19 @@ function getInitialNicknames(language: Language): NicknameState {
 
 function getRouteFromLocation(): Route {
   return window.location.pathname === "/demo" ? "demo" : "dashboard";
+}
+
+function getDefaultRedirectUri() {
+  if (typeof window === "undefined") {
+    return productionWebOrigin;
+  }
+
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return window.location.origin;
+  }
+
+  return productionWebOrigin;
 }
 
 function navigateTo(route: Route, setRoute: (route: Route) => void) {
