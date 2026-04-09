@@ -254,8 +254,10 @@ export async function saveGoalForUser(userId, goalKm) {
 
 export async function saveUserStravaAppCredentials(userId, payload) {
   const existingConfig = await getUserStravaAppConfig(userId);
-  const clientId = String(payload?.clientId ?? "").trim() || existingConfig?.clientId ?? "";
-  const clientSecret = String(payload?.clientSecret ?? "").trim() || existingConfig?.clientSecret ?? "";
+  const nextClientId = String(payload?.clientId ?? "").trim();
+  const nextClientSecret = String(payload?.clientSecret ?? "").trim();
+  const clientId = nextClientId || existingConfig?.clientId || "";
+  const clientSecret = nextClientSecret || existingConfig?.clientSecret || "";
   const redirectUri = env.webOrigin;
 
   if (!clientId || !clientSecret || !redirectUri) {
