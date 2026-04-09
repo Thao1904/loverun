@@ -650,9 +650,8 @@ async function collectHeartRateSeries(activities, accessToken) {
 }
 
 async function listRunningActivities(accessToken, date) {
-  const { afterUnix, beforeUnix } = getDayBounds(date, env.timezone);
   const activities = await stravaGet(
-    `/api/v3/athlete/activities?after=${afterUnix}&before=${beforeUnix}&page=1&per_page=100`,
+    "/api/v3/athlete/activities?page=1&per_page=100",
     accessToken,
   );
 
@@ -660,7 +659,7 @@ async function listRunningActivities(accessToken, date) {
     return [];
   }
 
-  return activities.filter((activity) => runTypes.has(activity.type));
+  return activities.filter((activity) => runTypes.has(activity.type) && isActivityOnDate(activity, date, env.timezone));
 }
 
 function summarizeActivities(activities, heartRateSeries) {
@@ -827,47 +826,37 @@ function getTodayDateString(timezone) {
   }).format(new Date());
 }
 
-function getDayBounds(dateString, timezone) {
-  const utcStart = zonedTimeToUtc(dateString, timezone, "00:00:00");
-  const utcEnd = zonedTimeToUtc(dateString, timezone, "23:59:59");
-  return {
-    afterUnix: Math.floor(utcStart.getTime() / 1000),
-    beforeUnix: Math.floor(utcEnd.getTime() / 1000),
-  };
+function isActivityOnDate(activity, dateString, timezone) {
+  const localDate = typeof activity?.start_date_local === "string" ? activity.start_date_local.slice(0, 10) : "";
+
+  if (localDate === dateString) {
+    return true;
+  }
+
+  if (typeof activity?.start_date === "string") {
+    return formatDateInTimezone(activity.start_date, timezone) === dateString;
+  }
+
+  return false;
 }
 
-function zonedTimeToUtc(dateString, timezone, timeString) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  const [hours, minutes, seconds] = timeString.split(":").map(Number);
-  const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-  const offsetMinutes = getTimeZoneOffsetMinutes(utcDate, timezone);
-  return new Date(utcDate.getTime() - offsetMinutes * 60_000);
-}
+function formatDateInTimezone(input, timezone) {
+  const date = input instanceof Date ? input : new Date(input);
 
-function getTimeZoneOffsetMinutes(date, timezone) {
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
   });
 
   const parts = formatter.formatToParts(date);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const asUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute),
-    Number(values.second),
-  );
-
-  return (asUtc - date.getTime()) / 60_000;
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function weightedAverage(items) {
